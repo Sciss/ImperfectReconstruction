@@ -32,6 +32,8 @@ object Exposure {
                     iso       : Int           = 100,
                     exposure  : PiExposure    = PiExposure.AUTO,
                     awb       : AWB           = AWB.AUTO,
+                    redGain   : Double        = 1.0,
+                    blueGain  : Double        = 1.0,
                     drc       : DRC           = DRC.OFF,
                     metering  : MeteringMode  = MeteringMode.AVERAGE,
                     flipH     : Boolean       = false,
@@ -75,6 +77,8 @@ object Exposure {
       }
       opt[Unit  ]('x', "flip-h")       text "Flip horizontally" action { (_, c) => c.copy(flipH = true) }
       opt[Unit  ]('y', "flip-v")       text "Flip vertically"  action { (_, c) => c.copy(flipV = true) }
+      opt[Double]("red")               text "Red gain"  action { (x, c) => c.copy(redGain  = x) }
+      opt[Double]("blue")              text "Blue gain" action { (x, c) => c.copy(blueGain = x) }
     }
     parser.parse(args, Config()).fold(sys.exit(1))(run)
   }
@@ -101,6 +105,7 @@ object Exposure {
     cam.setISO(iso)
     cam.setExposure(exposure)
     cam.setAWB(awb)
+    cam.setAWBGains(redGain, blueGain)
     cam.setMeteringMode(metering)
     if (flipH) cam.setHorizontalFlipOn()
     if (flipV) cam.setVerticalFlipOn()
