@@ -118,6 +118,7 @@ object Exposure {
     val ext = encoding.toString
 
     if (useGPIO) led.pulseGreen()  // 'ready'
+    else state = StateRecord
 
     //    // XXX TODO --- this could be slow for lots of pictures; perhaps use 'jumping'
     //    var count = outputDir.children(_.name.startsWith("frame-")).flatMap { f =>
