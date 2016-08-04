@@ -13,6 +13,8 @@
 
 package de.sciss.imperfect.difference
 
+import java.util.Locale
+
 import com.hopding.jrpicam.RPiCamera
 import com.hopding.jrpicam.enums.{AWB, DRC, Encoding, MeteringMode, Exposure => PiExposure}
 import de.sciss.file._
@@ -61,19 +63,19 @@ object Exposure {
       opt[Int   ]('s', "shutter")      text "Shutter speed in microseconds" action { (_, c) => c.copy(shutdown = true) }
       opt[Int   ]('i', "iso")          text "ISO value" action { (x, c) => c.copy(iso = x) }
       opt[String]('e', "exposure")     text "Exposure type (auto, night, nightpreview, backlight, spotlight, sports, snow, beach, verylong, fixedpfs, antishake, fireworks)" action { (x, c) =>
-        c.copy(exposure = PiExposure.valueOf(x))
+        c.copy(exposure = PiExposure.valueOf(x.toUpperCase(Locale.US)))
       }
       opt[String]('a', "awb")          text "Automatic white balance (off, auto, sun, cloud, shade, tungsten, fluorescent, incandescent, flash, horizon)" action { (x, c) =>
-        c.copy(awb = AWB.valueOf(x))
+        c.copy(awb = AWB.valueOf(x.toUpperCase(Locale.US)))
       }
       opt[String]('c', "drc")          text "Dynamic range compression (off, low, medium, high)" action { (x, c) =>
-        c.copy(drc = DRC.valueOf(x))
+        c.copy(drc = DRC.valueOf(x.toUpperCase(Locale.US)))
       }
       opt[String]('m', "metering")     text "Metering mode (average, spot, backlit, matrix)" action { (x, c) =>
-        c.copy(metering = MeteringMode.valueOf(x))
+        c.copy(metering = MeteringMode.valueOf(x.toUpperCase(Locale.US)))
       }
       opt[String]('f', "encoding")     text "Encoding (jpg, bmp, gif, png)" action { (x, c) =>
-        c.copy(encoding = Encoding.valueOf(x))
+        c.copy(encoding = Encoding.valueOf(x.toUpperCase(Locale.US)))
       }
       opt[Unit  ]('x', "flip-h")       text "Flip horizontally" action { (_, c) => c.copy(flipH = true) }
       opt[Unit  ]('y', "flip-v")       text "Flip vertically"  action { (_, c) => c.copy(flipV = true) }
