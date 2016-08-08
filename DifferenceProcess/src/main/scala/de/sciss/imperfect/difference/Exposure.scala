@@ -30,8 +30,8 @@ object Exposure {
                     height    : Int           = 2464, // /2
                     delayTime : Int           = 10000,
                     shutdown  : Boolean       = false,
-                    shutter   : Int           = 10000,
-                    iso       : Int           = 100,
+                    shutter   : Int           = 0, // 10000,
+                    iso       : Int           = 0, // 100,
                     exposure  : PiExposure    = PiExposure.AUTO,
                     awb       : AWB           = AWB.AUTO,
                     redGain   : Double        = 1.0,
@@ -103,8 +103,8 @@ object Exposure {
 
     val cam = new RPiCamera(siteDir.path)
     // cf. https://raspberrypi.stackexchange.com/questions/14047/
-    cam.setShutter(shutter) // 500000
-    cam.setISO(iso)
+    if (shutter > 0) cam.setShutter(shutter) // 500000
+    if (iso     > 0) cam.setISO(iso)
     cam.setExposure(exposure)
     cam.setAWB(awb)
     cam.setAWBGains(redGain, blueGain)
