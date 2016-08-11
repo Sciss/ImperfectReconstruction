@@ -1,0 +1,4 @@
+first esc series (08-aug-16)
+
+-t 5000 -s 100 -e sports -a off --red 1.0 --blue 1.0 -c off -x -y -d /home/pi/Pictures/foo
+

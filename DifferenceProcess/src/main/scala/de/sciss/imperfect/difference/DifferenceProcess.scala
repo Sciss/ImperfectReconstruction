@@ -17,40 +17,80 @@ import de.sciss.file._
 import de.sciss.fscape.gui.SimpleGUI
 import de.sciss.fscape._
 import de.sciss.synth.io.AudioFileSpec
+import scopt.OptionParser
 
 import scala.swing.Swing
 
 object DifferenceProcess {
-  def main(args: Array[String]): Unit = median()
+  case class Config(templateIn  : File    = file("/") /"media" / "hhrutz" / "PRINT_DESK" / "site-9" / "frame-%d.jpg",
+                    templateOut : File    = userHome / "Documents" / "projects" / "Imperfect" / "site-9" / "frame-%d.jpg",
+                    strange     : Boolean = false,
+                    idxRange0   : Range   = 1 to 500,
+                    width       : Int     = 1024,
+                    height      : Int     = 1024,
+                    trimLeft    : Int     = 800,
+                    trimTop     : Int     = 500,
+                    gain        : Double  = 16.0,
+                    gamma       : Double  = 1.2,
+                    seqLen      : Int     = 30,
+                    medianSide  : Int     = 3,
+                    thresh      : Double  = 0.1
+                   )
 
-  def median(): Unit = {
+//  val baseDirOut    = userHome / "Documents" / "projects" / "Imperfect" / (if (STRANGE) "site-9s" else "site-9")
+//  val templateOut   = baseDirOut / "frame-%d.jpg")
+
+  def main(args: Array[String]): Unit = {
+    val parser = new OptionParser[Config]("DifferenceProcess") {
+      opt[File  ]('i', "template-in")  text "Image file template input"  action { (x, c) => c.copy(templateIn  = x) }
+      opt[File  ]('o', "template-out") text "Image file template output" action { (x, c) => c.copy(templateOut = x) }
+      opt[Unit  ]("strange")           text "Strange scan mode" action { (_, c) => c.copy(strange = true) }
+      opt[Int   ]("start")             text "Start frame (inclusive)" action { (x, c) =>
+        c.copy(idxRange0 = if (c.idxRange0.isInclusive) x to c.idxRange0.end else x until c.idxRange0.end)
+      }
+      opt[Int   ]("stop")              text "End frame (exclusive)" action { (x, c) =>
+        c.copy(idxRange0 = c.idxRange0.start until x)
+      }
+      opt[Int   ]("last")              text "End frame (inclusive)" action { (x, c) =>
+        c.copy(idxRange0 = c.idxRange0.start to x)
+      }
+      opt[Int   ]('w', "width")        text "Image width in pixels"  action { (x, c) => c.copy(width  = x) }
+      opt[Int   ]('h', "height")       text "Image height in pixels" action { (x, c) => c.copy(height = x) }
+      opt[Int   ]('l', "trim-left")    action { (x, c) => c.copy(trimLeft = x) }
+      opt[Int   ]('t', "trim-top")     action { (x, c) => c.copy(trimTop  = x) }
+      opt[Double]("gain")              text "Gain factor"  action { (x, c) => c.copy(gain = x) }
+      opt[Double]("threshold")         action { (x, c) => c.copy(thresh = x) }
+      opt[Int   ]('n', "seq-len")      text "Sliding window length" action { (x, c) => c.copy(seqLen = x) }
+      opt[Int   ]('m', "median-side")  text "Median side length" action { (x, c) => c.copy(medianSide = x) }
+    }
+    parser.parse(args, Config()).fold(sys.exit(1))(run)
+  }
+
+  def run(config: Config): Unit = {
+    import config._
+
     val SEQUENCE      = true
-    val STRANGE       = true
-
-    val baseDirIn     = userHome / "Documents" / "projects" / "Eisenerz" / "image_work6"
-    val templateIn    = baseDirIn / "frame-%d.jpg"
-    val baseDirOut    = userHome / "Documents" / "projects" / "Imperfect" / (if (STRANGE) "image_diff6s" else "image_diff6")
-    val templateOut   = baseDirOut / "frame-%d.jpg"
-    val idxRange0     = 276 to 628
     val idxRange      = (if (SEQUENCE) idxRange0 else idxRange0.take(30)).map(x => x: GE)
     val numInput      = idxRange.size
     val indices       = idxRange.reduce(_ ++ _)   // XXX TODO --- we need a better abstraction for this
-    val widthIn       = 3280
-    val heightIn      = 2464
-    val width         = 1920
-    val height        = 1080
-    val trimLeft      = if (STRANGE) 400 else 840
-    val trimTop       = if (STRANGE) 400 else 720
-    val gain          = 4.5 // 9.0
-    val gamma         = if (STRANGE) 1.4 else 1.2 // 1.4
-    val seqLen        = 30
+      val widthIn       = 3280  // XXX TODO read from first input image!
+    val heightIn      = 2464  // XXX TODO read from first input image!
+//    val width         = 1920
+//    val height        = 1080
+//    val width         = 1024
+////    val height        = 1024
+//    val trimLeft      = if (strange) 400 else 840
+//    val trimTop       = if (strange) 400 else 720
+//    val gain          = 4.5 // 9.0
+//    val gamma         = if (strange) 1.4 else 1.2 // 1.4
+//    val seqLen        = 30
     val trimRight     = widthIn  - width  - trimLeft
     val trimBottom    = heightIn - height - trimTop
     val frameSizeIn   = widthIn * heightIn
     val frameSize     = width * height
-    val thresh        = if (STRANGE) 0.05 else 0.2 // 0.01 // 0.05 // 0.0 // 0.3333
-    val sideLen       = 3 // 2
-    val medianLen     = sideLen * 2 + 1
+//    val thresh        = if (strange) 0.05 else 0.2 // 0.01 // 0.05 // 0.0 // 0.3333
+//    val medianSide     = 3 // 2
+    val medianLen     = medianSide * 2 + 1
 
     require(trimLeft >= 0 && trimRight >= 0 && trimTop >= 0 && trimBottom >= 0)
     //    val thresh    = 0.2 / 150
@@ -62,9 +102,9 @@ object DifferenceProcess {
     //    fltBlur.setRadius(7)
     //    fltBlur.setThreshold(20)
 
-    val config  = stream.Control.Config()
-    config.blockSize  = width * 2
-    config.useAsync   = false
+    val streamCfg = stream.Control.Config()
+    streamCfg.blockSize  = width * 2
+    streamCfg.useAsync   = false
 
     val g = Graph {
       import graph._
@@ -84,7 +124,7 @@ object DifferenceProcess {
       def quarter(in: GE): GE = {
         val half1 = ResizeWindow(in   , size = widthIn         , start = trimLeft       , stop = -trimRight)
         // strange-artifact-1: use `size = frameSizeIn`, `trimLeft = 400`, `trimTop = 400`.
-        val half2 = ResizeWindow(half1, size = if (STRANGE) frameSizeIn else width * heightIn,
+        val half2 = ResizeWindow(half1, size = if (strange) frameSizeIn else width * heightIn,
           start = width * trimTop, stop = -width * trimBottom)
         half2
       }
@@ -125,7 +165,7 @@ object DifferenceProcess {
       //      val comp0     = delayFrame(lum, n = sideLen)
       ////      val comp      = comp0.elastic((sideLen * frameSize + config.blockSize - 1) / config.blockSize)
       //      val comp      = BufferDisk(comp0)
-      val dly   = delayFrame(mkImgSeq(), n = sideLen).take(frameSize * (numInput - (medianLen - 1))) // .dropRight(sideLen * frameSize)
+      val dly   = delayFrame(mkImgSeq(), n = medianSide).take(frameSize * (numInput - (medianLen - 1))) // .dropRight(sideLen * frameSize)
       val comp  = extractBrightness(blur(dly))
 
       //      val runTrig   = Impulse(1.0 / medianLen)
@@ -179,7 +219,7 @@ object DifferenceProcess {
         //        val exposeSlid  = expose.elastic(dlyElastic) - exposeDly
         // OutOfMemoryError -- buffer to disk instead
         val exposeSlid  = exposeDly - BufferDisk(expose)
-        val sig: GE = if (STRANGE) {
+        val sig: GE = if (strange) {
           val in        = exposeSlid
           val resetTr   = Impulse(1.0 / frameSize)
           val maxR      = RunningMax(in.abs, trig = resetTr)
@@ -213,7 +253,7 @@ object DifferenceProcess {
       }
     }
 
-    val ctrl    = stream.Control(config)
+    val ctrl = stream.Control(streamCfg)
     ctrl.run(g)
 
     Swing.onEDT {

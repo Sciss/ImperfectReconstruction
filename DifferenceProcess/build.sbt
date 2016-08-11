@@ -27,7 +27,7 @@ lazy val commonSettings = Seq(
     "de.sciss"          %% "scalaaudiofile"     % "1.4.5",
     "de.sciss"          %% "fscape"             % "2.0.0-SNAPSHOT",
     "com.pi4j"          %  "pi4j-core"          % "1.0",
-    "de.sciss"          %  "jrpicam"            % "0.2.0-SNAPSHOT"
+    "de.sciss"          %  "jrpicam"            % "0.2.0"
 //    "de.sciss"          %% "fscapejobs"         % "1.5.0"
   ),
   target in assembly := baseDirectory.value
