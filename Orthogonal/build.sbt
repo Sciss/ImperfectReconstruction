@@ -17,7 +17,8 @@ lazy val commonSettings = Seq(
     "de.sciss"          %% "kollflitz"          % "0.2.0",
     "com.github.scopt"  %% "scopt"              % "3.4.0",
     "de.sciss"          %% "fscape"             % "2.0.0-SNAPSHOT"
-  )
+  ),
+  target in assembly := baseDirectory.value
 )
 
 lazy val gpl2 = "GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt")
@@ -26,7 +27,7 @@ lazy val root = Project(id = baseNameL, base = file("."))
   .settings(commonSettings)
 
 // -------------
-// 
-// mainClass in assembly := Some("de.sciss.imperfect.difference.Exposure")
-// 
-// assemblyJarName in assembly := s"$baseName.jar"
+
+mainClass in assembly := Some("de.sciss.imperfect.orthogonal.Orthogonal")
+
+assemblyJarName in assembly := s"$baseName.jar"
