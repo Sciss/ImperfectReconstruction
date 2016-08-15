@@ -31,7 +31,10 @@ object Orthogonal {
                     height      : Int     = 1024,
                     trimLeft    : Int     = 400,
                     trimTop     : Int     = 24,
-                    gain        : Double  = 1.0
+                    gain        : Double  = 32.0,
+                    clip        : Double  = math.Pi / 8,
+                    smear       : Double  = 0.97,
+                    noise       : Double  = 1.0
                    )
 
   def main(args: Array[String]): Unit = {
@@ -53,6 +56,9 @@ object Orthogonal {
       opt[Int   ]('l', "trim-left")    action { (x, c) => c.copy(trimLeft = x) }
       opt[Int   ]('t', "trim-top")     action { (x, c) => c.copy(trimTop  = x) }
       opt[Double]('g', "gain")         action { (x, c) => c.copy(gain = x) }
+      opt[Double]('c', "clip")         action { (x, c) => c.copy(clip = x) }
+      opt[Double]("smear")             action { (x, c) => c.copy(smear = x) }
+      opt[Double]("noise")             action { (x, c) => c.copy(noise = x) }
     }
     parser.parse(args, Config()).fold(sys.exit(1))(run)
   }
@@ -111,9 +117,21 @@ object Orthogonal {
 //        val minLag    = OnePoleWindow(minG, size = frameSize, coef = step)
 //        val maxLag    = OnePoleWindow(maxG, size = frameSize, coef = step)
         val step      = (0: GE) ++ (0.999.pow(1.0/frameSize): GE)
-        val minLag    = OnePole(minG, coef = step)
-        val maxLag    = OnePole(maxG, coef = step)
-//        val buf       = BufferDisk(in)
+
+//        ChannelProxy(minG, 0).poll(1.0/frameSize, "min-red  ")
+//        ChannelProxy(minG, 1).poll(1.0/frameSize, "min-green")
+//        ChannelProxy(minG, 2).poll(1.0/frameSize, "min-blue ")
+//
+//        ChannelProxy(maxG, 0).poll(1.0/frameSize, "max-red  ")
+//        ChannelProxy(maxG, 1).poll(1.0/frameSize, "max-green")
+//        ChannelProxy(maxG, 2).poll(1.0/frameSize, "max-blue ")
+
+//        val minLag    = OnePole(minG, coef = step)
+//        val maxLag    = OnePole(maxG, coef = step)
+        val minLag    = OnePole(minG.max(-1).min(1), coef = step)
+        val maxLag    = OnePole(maxG.max(-1).min(1), coef = step)
+
+        //        val buf       = BufferDisk(in)
         val buf       = in.elastic(frameSize/streamCfg.blockSize + 1)
 //        gain.ampdb.roundTo(0.01).poll(0, "gain [dB]")
         // Plot1D(in, width * height)
@@ -137,9 +155,11 @@ object Orthogonal {
       val ortho1  = ResizeWindow(in = ortho , size = frameSize        , start =  width, stop = 0)
       val ortho2  = ResizeWindow(in = ortho1, size = frameSize - width, start = -width, stop = 0)
       val eq      = (ortho2 * gain).tan
-      val smear   = OnePoleWindow(in = eq, size = frameSize, coef = 0.98)
-      val sig0    = normalizeFrames(smear)
-      val sig     = (sig0 + WhiteNoise(1.0/255).take(frameSize.toLong * numInput)).max(0).min(1)
+      val sm      = OnePoleWindow(in = eq, size = frameSize, coef = smear)
+//      val sig0    = normalizeFrames(smear)
+      val sig0    = sm.linlin(-clip, clip, 0, 1)
+      val sig1    = if (noise <= 0) sig0 else sig0 + WhiteNoise(noise/255).take(frameSize.toLong * numInput)
+      val sig     = sig1.max(0).min(1)
 //      val sig = ortho.linlin(-1, 1, 0, gain).max(0).min(1)
 
       val idxRangeOut = 1 to idxRange.size // - (medianLen - 1)
