@@ -22,8 +22,8 @@ import scopt.OptionParser
 import scala.swing.Swing
 
 object DifferenceProcess {
-  case class Config(templateIn  : File    = file("/") /"media" / "hhrutz" / "PRINT_DESK" / "site-9out" / "frame-%d.jpg",
-                    templateOut : File    = userHome / "Documents" / "projects" / "Imperfect" / "site-9" / "frame-%d.jpg",
+  case class Config(templateIn  : File    = file("/") /"media" / "hhrutz" / "PRINT_DESK" / "in" / "frame-%d.jpg",
+                    templateOut : File    = userHome / "Documents" / "projects" / "Imperfect" / "out" / "frame-%d.jpg",
                     strange     : Boolean = false,
                     idxRange0   : Range   = 1 to 500,
                     width       : Int     = 1024,
@@ -118,7 +118,7 @@ object DifferenceProcess {
       def blur(in: GE): GE = in // XXX TODO --- perhaps 2D-FFT-based convolution --- fltBlur.filter(in, null)
 
       // actually "negative delay"
-      def delayFrame(in: GE, n: Int = 1): GE = in.drop(frameSize * n)
+      def delayFrame(in: GE, n: Int = 1): GE = in.drop(frameSize.toLong * n)
 
       def extractBrightness(in: GE): GE = {
         val r   = ChannelProxy(in, 0)
@@ -175,7 +175,7 @@ object DifferenceProcess {
       //      val comp0     = delayFrame(lum, n = sideLen)
       ////      val comp      = comp0.elastic((sideLen * frameSize + config.blockSize - 1) / config.blockSize)
       //      val comp      = BufferDisk(comp0)
-      val dly   = delayFrame(mkImgSeq(), n = medianSide).take(frameSize * (numInput - (medianLen - 1))) // .dropRight(sideLen * frameSize)
+      val dly   = delayFrame(mkImgSeq(), n = medianSide).take(frameSize.toLong * (numInput - (medianLen - 1))) // .dropRight(sideLen * frameSize)
       val comp  = extractBrightness(blur(dly))
 
       //      val runTrig   = Impulse(1.0 / medianLen)
@@ -250,7 +250,7 @@ object DifferenceProcess {
           ImageFileSeqOut(template = templateOut, spec = spec, in = sig, indices = indicesOut)
 
       } else {
-        val last  = expose.take(frameSize * (numInput - (medianLen - 1))).takeRight(frameSize)
+        val last  = expose.take(frameSize.toLong * (numInput - (medianLen - 1))).takeRight(frameSize)
         // min.take(frameSize * (numInput - (medianLen - 1))).takeRight(frameSize)
         val sig   = normalize(last)
         val spec  = ImageFile.Spec(width = width, height = height, numChannels = /* 1 */ 3,
