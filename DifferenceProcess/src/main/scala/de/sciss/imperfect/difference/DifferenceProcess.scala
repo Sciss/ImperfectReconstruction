@@ -94,6 +94,7 @@ object DifferenceProcess {
     val trimBottom    = heightIn - height - trimTop
     val frameSizeIn   = widthIn * heightIn
     val frameSize     = width * height
+    val frameSizeL    = frameSize.toLong
 //    val thresh        = if (strange) 0.05 else 0.2 // 0.01 // 0.05 // 0.0 // 0.3333
 //    val medianSide     = 3 // 2
     val medianLen     = medianSide * 2 + 1
@@ -118,7 +119,7 @@ object DifferenceProcess {
       def blur(in: GE): GE = in // XXX TODO --- perhaps 2D-FFT-based convolution --- fltBlur.filter(in, null)
 
       // actually "negative delay"
-      def delayFrame(in: GE, n: Int = 1): GE = in.drop(frameSize.toLong * n)
+      def delayFrame(in: GE, n: Int = 1): GE = in.drop(frameSizeL * n)
 
       def extractBrightness(in: GE): GE = {
         val r   = ChannelProxy(in, 0)
@@ -170,15 +171,15 @@ object DifferenceProcess {
       //
       //      val lumC      = lumWin(sideLen)
 
-      val lumSlide  = Sliding(lum, size = frameSize * medianLen, step = frameSize)
+      val lumSlide  = Sliding(lum, size = frameSizeL * medianLen, step = frameSize)
       //      val lumT      = TransposeMatrix(lumSlide, columns = frameSize, rows = medianLen)
       //      val comp0     = delayFrame(lum, n = sideLen)
       ////      val comp      = comp0.elastic((sideLen * frameSize + config.blockSize - 1) / config.blockSize)
       //      val comp      = BufferDisk(comp0)
-      val dly   = delayFrame(mkImgSeq(), n = medianSide).take(frameSize.toLong * (numInput - (medianLen - 1))) // .dropRight(sideLen * frameSize)
+      val dly   = delayFrame(mkImgSeq(), n = medianSide).take(frameSizeL * (numInput - (medianLen - 1))) // .dropRight(sideLen * frameSize)
       val comp  = extractBrightness(blur(dly))
 
-      //      val runTrig   = Impulse(1.0 / medianLen)
+      //      val runTrig   = Metro(medianLenL)
       //      val minR      = RunningMin(lumT, runTrig)
       //      val maxR      = RunningMax(lumT, runTrig)
       //      val meanR     = RunningSum(lumT, runTrig) / medianLen
@@ -187,7 +188,7 @@ object DifferenceProcess {
       //      // XXX TODO --- use median instead of mean
       //      val mean      = Sliding(meanR.drop(medianLen - 1), size = 1, step = medianLen)
 
-      val medianTrig = Impulse(1.0/(frameSize * medianLen))
+      val medianTrig = Metro(frameSizeL * medianLen)
       val minR      = RunningWindowMin(lumSlide, size = frameSize, trig = medianTrig)
       val maxR      = RunningWindowMax(lumSlide, size = frameSize, trig = medianTrig)
       val sumR      = RunningWindowSum(lumSlide, size = frameSize, trig = medianTrig)
@@ -231,9 +232,9 @@ object DifferenceProcess {
         val exposeSlid  = exposeDly - BufferDisk(expose)
         val sig: GE = if (strange) {
           val in        = exposeSlid
-          val resetTr   = Impulse(1.0 / frameSize)
+          val resetTr   = Metro(frameSize)
           val maxR      = RunningMax(in.abs, trig = resetTr)
-          val max       = Gate(maxR.drop(frameSize - 1), Impulse(1.0 / frameSize))
+          val max       = Gate(maxR.drop(frameSize - 1), Metro(frameSize))
           val gain      = max.reciprocal // * headroom
           val buf       = BufferDisk(in)
           buf * gain
@@ -250,7 +251,7 @@ object DifferenceProcess {
           ImageFileSeqOut(template = templateOut, spec = spec, in = sig, indices = indicesOut)
 
       } else {
-        val last  = expose.take(frameSize.toLong * (numInput - (medianLen - 1))).takeRight(frameSize)
+        val last  = expose.take(frameSizeL * (numInput - (medianLen - 1))).takeRight(frameSize)
         // min.take(frameSize * (numInput - (medianLen - 1))).takeRight(frameSize)
         val sig   = normalize(last)
         val spec  = ImageFile.Spec(width = width, height = height, numChannels = /* 1 */ 3,
