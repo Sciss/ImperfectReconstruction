@@ -214,7 +214,7 @@ object DifferenceProcess {
       //      lumT    .poll(1.0/frameSize, "lumT    ")
       //      min     .poll(1.0/frameSize, "min     ")
       //      max     .poll(1.0/frameSize, "max     ")
-      maskBlur.poll(1.0/frameSize, "maskBlur")
+      maskBlur.poll(frameSize, "maskBlur")
 
       val sel     = maskBlur * dly
       //      val expose  = RunningWindowMax(sel, size = frameSize)
