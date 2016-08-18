@@ -34,7 +34,10 @@ object DifferenceProcess {
                     gamma       : Double  = 1.2,
                     seqLen      : Int     = 30,
                     medianSide  : Int     = 3,
-                    thresh      : Double  = 0.1
+                    thresh      : Double  = 0.1,
+                    redGain     : Double  = 1.0,
+                    greenGain   : Double  = 1.0,
+                    blueGain    : Double  = 1.0
                    )
 
 //  val baseDirOut    = userHome / "Documents" / "projects" / "Imperfect" / (if (STRANGE) "site-9s" else "site-9")
@@ -73,7 +76,7 @@ object DifferenceProcess {
     val idxRange      = (if (SEQUENCE) idxRange0 else idxRange0.take(30)).map(x => x: GE)
     val numInput      = idxRange.size
     val indices       = idxRange.reduce(_ ++ _)   // XXX TODO --- we need a better abstraction for this
-      val widthIn       = 3280  // XXX TODO read from first input image!
+    val widthIn       = 3280  // XXX TODO read from first input image!
     val heightIn      = 2464  // XXX TODO read from first input image!
 //    val width         = 1920
 //    val height        = 1080
@@ -144,7 +147,11 @@ object DifferenceProcess {
         quarter(res)
       }
 
-      val bufIn     = mkImgSeq()
+      val bufIn0 = mkImgSeq()
+      val bufIn = if (redGain == 1.0 && blueGain == 1.0 && greenGain == 1.0) bufIn0 else {
+        bufIn0 * Seq[GE](redGain, blueGain, greenGain)
+      }
+
       //      val bufIn     = WhiteNoise(Seq.fill[GE](3)(0.5)).take(frameSize * idxRange.size)
       val blurImg   = blur(bufIn)
       val lum       = extractBrightness(blurImg)
