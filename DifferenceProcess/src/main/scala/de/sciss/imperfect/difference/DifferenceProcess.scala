@@ -22,7 +22,7 @@ import scopt.OptionParser
 import scala.swing.Swing
 
 object DifferenceProcess {
-  case class Config(templateIn  : File    = file("/") /"media" / "hhrutz" / "PRINT_DESK" / "site-9" / "frame-%d.jpg",
+  case class Config(templateIn  : File    = file("/") /"media" / "hhrutz" / "PRINT_DESK" / "site-9out" / "frame-%d.jpg",
                     templateOut : File    = userHome / "Documents" / "projects" / "Imperfect" / "site-9" / "frame-%d.jpg",
                     strange     : Boolean = false,
                     idxRange0   : Range   = 1 to 500,
