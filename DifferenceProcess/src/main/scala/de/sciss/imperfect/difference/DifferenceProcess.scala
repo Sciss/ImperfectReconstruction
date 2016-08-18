@@ -65,6 +65,9 @@ object DifferenceProcess {
       opt[Double]("threshold")         action { (x, c) => c.copy(thresh = x) }
       opt[Int   ]('n', "seq-len")      text "Sliding window length" action { (x, c) => c.copy(seqLen = x) }
       opt[Int   ]('m', "median-side")  text "Median side length" action { (x, c) => c.copy(medianSide = x) }
+      opt[Double]("red-gain")          action { (x, c) => c.copy(redGain   = x) }
+      opt[Double]("green-gain")        action { (x, c) => c.copy(greenGain = x) }
+      opt[Double]("blue-gain")         action { (x, c) => c.copy(blueGain  = x) }
     }
     parser.parse(args, Config()).fold(sys.exit(1))(run)
   }
