@@ -151,10 +151,14 @@ object DifferenceProcess {
         quarter(res)
       }
 
-      val bufIn0 = mkImgSeq()
-      val bufIn = if (redGain == 1.0 && blueGain == 1.0 && greenGain == 1.0) bufIn0 else {
-        bufIn0 * Seq[GE](redGain, blueGain, greenGain)
-      }
+      val bufIn = mkImgSeq()
+//      val bufIn: GE = if (redGain == 1.0 && blueGain == 1.0 && greenGain == 1.0) bufIn0 else {
+//        println(s"redGain = $redGain, greenGain = $greenGain, blueGain = $blueGain")
+//        val r = ChannelProxy(bufIn0, 0) * 1.01 // redGain
+//        val g = ChannelProxy(bufIn0, 1) * 1.01 // greenGain
+//        val b = ChannelProxy(bufIn0, 2) * 1.01 // blueGain
+//        Seq(r, g, b)
+//      }
 
       //      val bufIn     = WhiteNoise(Seq.fill[GE](3)(0.5)).take(frameSize * idxRange.size)
       val blurImg   = blur(bufIn)
@@ -239,7 +243,8 @@ object DifferenceProcess {
           val buf       = BufferDisk(in)
           buf * gain
         } else {
-          (exposeSlid * gain).max(0.0).min(1.0).pow(gamma)
+          val gain1 = gain * (Seq[GE](redGain, greenGain, blueGain): GE)
+          (exposeSlid * gain1).max(0.0).min(1.0).pow(gamma)
         }
 
         val spec  = ImageFile.Spec(width = width, height = height, numChannels = /* 1 */ 3,
