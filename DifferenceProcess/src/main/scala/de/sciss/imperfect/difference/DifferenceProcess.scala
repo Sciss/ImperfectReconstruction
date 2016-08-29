@@ -99,7 +99,10 @@ object DifferenceProcess {
 //    val medianSide     = 3 // 2
     val medianLen     = medianSide * 2 + 1
 
-    require(trimLeft >= 0 && trimRight >= 0 && trimTop >= 0 && trimBottom >= 0)
+    require(trimLeft   >= 0, s"trimLeft ($trimLeft) must be >= 0")
+    require(trimRight  >= 0, s"trimRight ($trimRight) must be >= 0")
+    require(trimTop    >= 0, s"trimTop ($trimTop) must be >= 0")
+    require(trimBottom >= 0, s"trimBottom ($trimBottom) must be >= 0")
     //    val thresh    = 0.2 / 150
 
     //    val fOut      = userHome / "Documents" / "temp" / "out_median.png"
