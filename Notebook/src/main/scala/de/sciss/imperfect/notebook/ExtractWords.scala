@@ -13,8 +13,8 @@
 
 package de.sciss.imperfect.notebook
 
-import java.awt.Color
-import java.awt.geom.{AffineTransform, Path2D, Rectangle2D}
+import java.awt.{BasicStroke, Color, Shape}
+import java.awt.geom.{AffineTransform, Area, Path2D, Rectangle2D}
 import java.awt.image.BufferedImage
 import java.util.Locale
 import javax.imageio.ImageIO
@@ -119,16 +119,44 @@ object ExtractWords {
         val imgOutW   = math.ceil(w.bounds.getWidth * imageScale).toInt + fadeSize
         val bufImgOut = new BufferedImage(imgOutW, imgOutH, BufferedImage.TYPE_INT_ARGB)
         val gOut      = bufImgOut.createGraphics()
-        val descent0  = (w.bounds.getMaxY - w.baseline) * imageScale
         at.setToIdentity()
         at.scale     (imageScale, imageScale)
         at.translate (-w.bounds.getMinX, -w.baseline /* -w.bounds.getMinY */)
         val scaled    = at.createTransformedShape(w.path)
         at.setToTranslation(fadeSizeH, imgOutH - descent /* + descent0 */ + fadeSizeH)
-        val translated = at.createTransformedShape(scaled)
-        gOut.setClip(translated)
-        gOut.setColor(Color.red)
-        gOut.fillRect(0, 0, imgOutW, imgOutH)
+        val basicShape = at.createTransformedShape(scaled)
+
+        def mkFadeShape(fd: Int, in: Shape): Area = {
+          val aIn = new Area(in)
+          if (fd < fadeSizeH) {
+            val strk = new BasicStroke((fadeSizeH - fd).toFloat * 2)
+            val in1 = strk.createStrokedShape(in)
+            aIn.subtract(new Area(in1))
+          } else if (fd > fadeSizeH) {
+            val strk = new BasicStroke((fd - fadeSizeH).toFloat * 2)
+            val in1 = strk.createStrokedShape(in)
+            aIn.add(new Area(in1))
+          }
+          aIn
+        }
+
+        var clip0: Area = null
+        for (fd <- 0 until fadeSize) {
+          import numbers.Implicits._
+          val alpha = fd.linlin(0, fadeSize, 1.0, 0.0)
+          val clip1 = mkFadeShape(fd, basicShape)
+          val clip2 = if (clip0 == null) clip1 else {
+            val res = new Area(clip1)
+            res.subtract(clip0)
+            res
+          }
+          gOut.setClip(clip2)
+          val colr = new Color(0xFF, 0, 0, (alpha * 0xFF).toInt)
+          gOut.setColor(colr)
+          gOut.fillRect(0, 0, imgOutW, imgOutH)
+          clip0 = clip1
+        }
+
         //      gOut.drawImage(bufImgIn, at, null)
         ImageIO.write(bufImgOut, fmt, outF)
         gOut.dispose()
