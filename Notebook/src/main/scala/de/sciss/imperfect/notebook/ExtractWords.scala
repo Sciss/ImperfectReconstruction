@@ -13,36 +13,48 @@
 
 package de.sciss.imperfect.notebook
 
-import java.awt.geom.Path2D
+import java.awt.Color
+import java.awt.geom.{AffineTransform, Path2D, Rectangle2D}
+import java.awt.image.BufferedImage
+import java.util.Locale
+import javax.imageio.ImageIO
 
 import de.sciss.file._
-import org.apache.batik.parser.{PathHandler, PathParser}
+import de.sciss.numbers
+import org.apache.batik.parser.PathParser
 import scopt.OptionParser
 
 import scala.xml.{NodeSeq, XML}
 
 object ExtractWords {
-
   case class Config(svgIn     : File    = file("in.svg"),
                     imageIn   : File    = file("in.jpg"),
-                    outDir    : File    = file("out"),
-                    imageScale: Double  = 5
+                    outTemp   : File    = file("out-%d.png"),
+                    imageScale: Double  = 5,
+                    fadeSize  : Int     = 8,
+                    overwrite : Boolean = false
                    )
 
   def main(args: Array[String]): Unit = {
     val parser = new OptionParser[Config]("ExtractWords") {
       opt[File  ]("svg-in") required() text "Annotated SVG input file"  action { (x, c) => c.copy(svgIn = x) }
       opt[File  ]("image-in") required() text "Image (high-res) input file" action { (x, c) => c.copy(imageIn = x) }
-      opt[File  ]('d', "output-dir") required() text "Output directory" action { (x, c) => c.copy(outDir = x) }
+      opt[File  ]('d', "output-template") required() text "Output template" action { (x, c) => c.copy(outTemp = x) }
       opt[Double]("scale") text "Svg-to-image scale factor (default: 5)" action { (x, c) =>
         c.copy(imageScale = x)
       }
+      opt[Unit  ]("overwrite") required() text "Overwrite existing files" action { (_, c) => c.copy(overwrite = true) }
     }
     parser.parse(args, Config()).fold(sys.exit(1))(run)
   }
 
+  case class Word(idx: Int, path: Path2D, bounds: Rectangle2D, baseline: Double)
+
   def run(config: Config): Unit = {
     import config._
+
+    val fmt = outTemp.ext.toLowerCase(Locale.US)
+    require (fmt == "png" || fmt == "jpg", s"Unsupported image format '$fmt'")
 
     val xmlRoot   = XML.load(svgIn.toURI.toURL)
     val pathsXML  = xmlRoot.\\("path")
@@ -50,240 +62,88 @@ object ExtractWords {
     val (pathsBaselineXML, pathsWordXML) = pathsXML.partition(_.\("@style").text.contains("stroke:#0000ff"))
     println(s"Seeing ${pathsWordXML.size} word paths, ${pathsBaselineXML.size} pathsBaseline paths.")
 
-    val pathsWord = mkPaths(pathsWordXML)
-  }
+    val pathsWord       = mkPaths(pathsWordXML)
+    val boundsWord      = pathsWord.map(_.getBounds2D)
+    val pathsBaseline   = mkPaths(pathsBaselineXML)
+    val boundsBaseline  = pathsBaseline.map(_.getBounds2D)
+    val baselineHeight  = boundsBaseline.map(_.getHeight).max
+    if (baselineHeight != 1.0)
+      println(s"WARNING: Baseline shapes should all have height <= 1.0 (but found $baselineHeight).")
+    val baselineIndices = boundsBaseline.map { r =>
+      val cx = r.getCenterX
+      val cy = r.getCenterY
+      // note: contains with a rectangle of height zero always returns false!
+      boundsWord.indexWhere(_.contains(cx, cy))
+    }
+    require (!baselineIndices.contains(-1), "Not all baselines could be attributed")
+    require (baselineIndices == baselineIndices.sorted, "Baselines should appear in linear order")
 
-  final val USE_LOG = false
+//    println("---- words ----")
+//    println(boundsWord.map(r => f"Rect(${r.getX}, ${r.getY}, ${r.getWidth}, ${r.getHeight})").mkString("\n"))
+//    println("---- baselines ----")
+//    println(boundsBaseline.map(r => f"Rect(${r.getX}, ${r.getY}, ${r.getWidth}, ${r.getHeight})").mkString("\n"))
+//    println(baselineIndices.mkString(", "))
 
-  def log(what: => String): Unit = if (USE_LOG) println(what)
-
-  class Handler extends PathHandler {
-    private val out     = new Path2D.Double()
-
-    private var x       = 0f
-    private var y       = 0f
-    private var cx      = 0f
-    private var cy      = 0f
-
-    var indent          = "    p."
-    var eol             = ";\n"
-
-    private var ended   = false
-
-    private var isFirst = false
-    private var startX  = 0f
-    private var startY  = 0f
-
-    private
-
-    def result(): Path2D = {
-      require(ended, "Path has not yet ended")
-      out
+    val baselineMap = (baselineIndices zip boundsBaseline.map(_.getCenterY)).toMap
+    val words = pathsWord.zip(boundsWord).zipWithIndex.map { case ((path, bPath), pIdx) =>
+      val baseline = baselineMap.getOrElse(pIdx, {
+        val predIdx = (pIdx to 0 by -1).find(baselineMap.contains).get
+        val nextIdx = (pIdx until pathsWord.size).find(baselineMap.contains).get
+        val pred = baselineMap(predIdx)
+        val next = baselineMap(nextIdx)
+        import numbers.Implicits._
+        pIdx.linlin(predIdx, nextIdx, pred, next)
+      })
+      Word(pIdx, path, bPath, baseline)
     }
 
-    def startPath(): Unit = {
-      log("startPath()")
-      // newPath()
-      x   = 0
-      y   = 0
-      cx  = 0
-      cy  = 0
-      isFirst = true
-    }
+    val ascent  = words.map(w => w.baseline - w.bounds.getMinY).max * imageScale
+    val descent = words.map(w => w.bounds.getMaxY - w.baseline).max * imageScale
+    val imgOutH = math.ceil(ascent + descent).toInt + fadeSize
+    println(s"ascent $ascent, descent $descent, imgOutH $imgOutH")
 
-    //    private def newPath(): Unit = {
-    //      gpIdx += 1
-    //      path   = s"p$gpIdx"
-    //      // out.write(s"val $path = new GeneralPath(Path2D.WIND_EVEN_ODD)\n")
-    //    }
+    require (imageIn.isFile, s"Input image '$imageIn' not found.")
+    val bufImgIn  = ImageIO.read(imageIn)
+    println("Read input image.")
+    // val gIn    = bufImgIn.createGraphics()
+    val at        = new AffineTransform
 
-    def endPath(): Unit = {
-      log("endPath()")
-      require(!ended, "Path has already ended")
-      // out.write(s"$path.closePath()")
-      ended = true
-    }
+    val fadeSizeH = 0.5 * fadeSize
 
-    def movetoRel(x3: Float, y3: Float): Unit = {
-      log(s"movetoRel($x3, $y3)")
-      x  += x3
-      y  += y3
-      cx  = cx
-      cy  = cy
-      pathMoveTo(x, y)
-    }
-
-    def movetoAbs(x3: Float, y3: Float): Unit = {
-      log(s"movetoAbs($x3, $y3)")
-      cx  = x3
-      cy  = y3
-      x   = x3
-      y   = y3
-      pathMoveTo(x, y)
-    }
-
-    def closePath(): Unit = {
-      log("closePath()")
-      //      x   = 0
-      //      y   = 0
-      //      cx  = 0
-      //      cy  = 0
-      linetoAbs(startX, startY)
-
-      //      x   = startX
-      //      y   = startY
-      //      cx  = startX
-      //      cy  = startY
-      // out.write(s"${indent}closePath();\n")
-      isFirst = true
-
-      //      out.write(s"g2.fill($path)\n")
-      //      newPath()
-    }
-
-    def linetoRel(x3: Float, y3: Float): Unit = {
-      log(s"linetoRel($x3, $y3)")
-      x += x3
-      y += y3
-      cx = x
-      cy = y
-      pathLineTo(x, y)
-    }
-
-    def linetoAbs(x3: Float, y3: Float): Unit = {
-      log(s"linetoAbs($x3, $y3)")
-      x   = x3
-      y   = y3
-      cx  = x
-      cy  = y
-      pathLineTo(x, y)
-    }
-
-    def linetoHorizontalRel(x3: Float): Unit = {
-      log(s"linetoHorizontalRel($x3)")
-      x += x3
-      cx = x
-      cy = y
-      pathLineTo(x, y)
-    }
-
-    def linetoHorizontalAbs(x3: Float): Unit = {
-      log(s"linetoHorizontalAbs($x3)")
-      x  = x3
-      cx = x
-      cy = y
-      pathLineTo(x, y)
-    }
-
-    def linetoVerticalRel(y3: Float): Unit = {
-      log(s"linetoVerticalRel($y3)")
-      cx = x
-      y += y3
-      cy = y
-      pathLineTo(x, y)
-    }
-
-    def linetoVerticalAbs(y3: Float): Unit = {
-      log(s"linetoVerticalAbs($y3)")
-      cx = x
-      y  = y3
-      cy = y
-      pathLineTo(x, y)
-    }
-
-    def curvetoCubicRel(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float): Unit = {
-      log(s"curvetoCubicRel($x1, $y1, $x2, $y2, $x3, $y3)")
-      val x0  = x + x1
-      val y0  = y + y1
-      cx      = x + x2
-      cy      = y + y2
-      x      += x3
-      y      += y3
-      pathCurveTo(x0, y0, cx, cy, x, y)
-    }
-
-    def curvetoCubicAbs(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float): Unit = {
-      log(s"curvetoCubicAbs($x1, $y1, $x2, $y2, $x3, $y3)")
-      cx = x2
-      cy = y2
-      x  = x3
-      y  = y3
-      pathCurveTo(x1, y1, cx, cy, x, y)
-    }
-
-    def curvetoCubicSmoothRel(x2: Float, y2: Float, x3: Float, y3: Float): Unit = {
-      log(s"curvetoCubicSmoothRel($x2, $y2, $x3, $y3)")
-      val x1 = x * 2 - cx
-      val y1 = y * 2 - cy
-      cx     = x + x2
-      cy     = y + y2
-      x     += x3
-      y     += y3
-      pathCurveTo(x1, y1, cx, cy, x, y)
-    }
-
-    def curvetoCubicSmoothAbs(x2: Float, y2: Float, x3: Float, y3: Float): Unit = {
-      log(s"curvetoCubicSmoothAbs($x2, $y2, $x3, $y3)")
-      val x1  = x * 2 - cx
-      val y1  = y * 2 - cy
-      cx      = x2
-      cy      = y2
-      x       = x3
-      y       = y3
-      pathCurveTo(x1, y1, cx, cy, x, y)
-    }
-
-    def curvetoQuadraticRel(p1: Float, p2: Float, p3: Float, p4: Float): Unit = {
-      log(s"curvetoQuadraticRel($p1, $p2, $p3, $p4)")
-      ???
-    }
-
-    def curvetoQuadraticAbs(p1: Float, p2: Float, p3: Float, p4: Float): Unit = {
-      log(s"curvetoQuadraticAbs($p1, $p2, $p3, $p4)")
-      ???
-    }
-
-    def curvetoQuadraticSmoothRel(p1: Float, p2: Float): Unit = {
-      log(s"curvetoQuadraticSmoothRel($p1, $p2)")
-      ???
-    }
-
-    def curvetoQuadraticSmoothAbs(p1: Float, p2: Float): Unit = {
-      log(s"curvetoQuadraticSmoothAbs($p1, $p2)")
-      ???
-    }
-
-    def arcRel(p1: Float, p2: Float, p3: Float, p4: Boolean, p5: Boolean, p6: Float, p7: Float): Unit = {
-      log(s"arcRel($p1, $p2, $p3, $p4, $p5, $p6, $p7)")
-      ???
-    }
-
-    def arcAbs(p1: Float, p2: Float, p3: Float, p4: Boolean, p5: Boolean, p6: Float, p7: Float): Unit = {
-      log(s"arcAbs($p1, $p2, $p3, $p4, $p5, $p6, $p7)")
-      ???
-    }
-
-    private def pathMoveTo(x: Float, y: Float): Unit = {
-      if (isFirst) {
-        startX  = x
-        startY  = y
-        isFirst = false
+    words.foreach { w =>
+      val outName   = outTemp.name.format(w.idx + 1)
+      val outF      = outTemp.parentOption.fold(file(outName))(_ / outName)
+      if (!overwrite && outF.exists()) {
+        println(s"Skipping '$outF' - file already exists")
+      } else {
+        val imgOutW   = math.ceil(w.bounds.getWidth * imageScale).toInt + fadeSize
+        val bufImgOut = new BufferedImage(imgOutW, imgOutH, BufferedImage.TYPE_INT_ARGB)
+        val gOut      = bufImgOut.createGraphics()
+        val descent0  = (w.bounds.getMaxY - w.baseline) * imageScale
+        at.setToIdentity()
+        at.scale     (imageScale, imageScale)
+        at.translate (-w.bounds.getMinX, -w.baseline /* -w.bounds.getMinY */)
+        val scaled    = at.createTransformedShape(w.path)
+        at.setToTranslation(fadeSizeH, imgOutH - descent /* + descent0 */ + fadeSizeH)
+        val translated = at.createTransformedShape(scaled)
+        gOut.setClip(translated)
+        gOut.setColor(Color.red)
+        gOut.fillRect(0, 0, imgOutW, imgOutH)
+        //      gOut.drawImage(bufImgIn, at, null)
+        ImageIO.write(bufImgOut, fmt, outF)
+        gOut.dispose()
+        bufImgOut.flush()
       }
-      out.moveTo(x, y)
     }
 
-    private def pathLineTo(x: Float, y: Float): Unit =
-      out.lineTo(x, y)
-
-    private def pathCurveTo(x1: Float, y1: Float, x2: Float, y2: Float, x3: Float, y3: Float): Unit =
-      out.curveTo(x1, y1, x2, y2, x3, y3)
+    bufImgIn.flush()
   }
 
   def mkPaths(in: NodeSeq): Vector[Path2D] = {
     val parser = new PathParser
     in.map { n =>
       val path  = (n \ "@d").text
-      val h     = new Handler
+      val h     = new Path2DHandler
       parser.setPathHandler(h)
       parser.parse(path)
       h.result()
