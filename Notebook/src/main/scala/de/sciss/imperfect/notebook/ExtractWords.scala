@@ -13,7 +13,7 @@
 
 package de.sciss.imperfect.notebook
 
-import java.awt.{BasicStroke, Color, Shape}
+import java.awt.{AlphaComposite, BasicStroke, Color, Shape}
 import java.awt.geom.{AffineTransform, Area, Path2D, Rectangle2D}
 import java.awt.image.BufferedImage
 import java.util.Locale
@@ -32,6 +32,7 @@ object ExtractWords {
                     outTemp   : File    = file("out-%d.png"),
                     imageScale: Double  = 5,
                     fadeSize  : Int     = 8,
+                    background: Int     = 0x00FFFFFF,
                     overwrite : Boolean = false
                    )
 
@@ -44,11 +45,14 @@ object ExtractWords {
         c.copy(imageScale = x)
       }
       opt[Unit  ]("overwrite") required() text "Overwrite existing files" action { (_, c) => c.copy(overwrite = true) }
+      opt[Int   ]("background") text "Background color (default: 0x00FFFFFF" action { (x, c) =>
+        c.copy(background = x)
+      }
     }
     parser.parse(args, Config()).fold(sys.exit(1))(run)
   }
 
-  case class Word(idx: Int, path: Path2D, bounds: Rectangle2D, baseline: Double)
+  case class Word(idx: Int, path: Path2D, bounds: Rectangle2D, baseline: Double, erase: Boolean)
 
   def run(config: Config): Unit = {
     import config._
@@ -63,6 +67,7 @@ object ExtractWords {
     println(s"Seeing ${pathsWordXML.size} word paths, ${pathsBaselineXML.size} pathsBaseline paths.")
 
     val pathsWord       = mkPaths(pathsWordXML)
+    val erased          = pathsWordXML.map(n => (n\"@notebook").text.contains("-erase")).toVector
     val boundsWord      = pathsWord.map(_.getBounds2D)
     val pathsBaseline   = mkPaths(pathsBaselineXML)
     val boundsBaseline  = pathsBaseline.map(_.getBounds2D)
@@ -85,7 +90,7 @@ object ExtractWords {
 //    println(baselineIndices.mkString(", "))
 
     val baselineMap = (baselineIndices zip boundsBaseline.map(_.getCenterY)).toMap
-    val words = pathsWord.zip(boundsWord).zipWithIndex.map { case ((path, bPath), pIdx) =>
+    val words = pathsWord.zip(boundsWord).zip(erased).zipWithIndex.map { case (((path, bPath), er), pIdx) =>
       val baseline = baselineMap.getOrElse(pIdx, {
         val predIdx = (pIdx to 0 by -1).find(baselineMap.contains).get
         val nextIdx = (pIdx until pathsWord.size).find(baselineMap.contains).get
@@ -94,7 +99,7 @@ object ExtractWords {
         import numbers.Implicits._
         pIdx.linlin(predIdx, nextIdx, pred, next)
       })
-      Word(pIdx, path, bPath, baseline)
+      Word(pIdx, path, bPath, baseline = baseline, erase = er)
     }
 
     val ascent  = words.map(w => w.baseline - w.bounds.getMinY).max * imageScale
@@ -111,14 +116,15 @@ object ExtractWords {
     val fadeSizeH = 0.5 * fadeSize
 
     words.foreach { w =>
-      val outName   = outTemp.name.format(w.idx + 1)
-      val outF      = outTemp.parentOption.fold(file(outName))(_ / outName)
+      val outF = formatFile(outTemp, w.idx + 1)
       if (!overwrite && outF.exists()) {
         println(s"Skipping '$outF' - file already exists")
       } else {
         val imgOutW   = math.ceil(w.bounds.getWidth * imageScale).toInt + fadeSize
         val bufImgOut = new BufferedImage(imgOutW, imgOutH, BufferedImage.TYPE_INT_ARGB)
         val gOut      = bufImgOut.createGraphics()
+        gOut.setColor(new Color(background, true))
+        gOut.fillRect(0, 0, imgOutW, imgOutH)
         at.setToIdentity()
         at.scale     (imageScale, imageScale)
         at.translate (-w.bounds.getMinX, -w.baseline /* -w.bounds.getMinY */)
@@ -141,7 +147,7 @@ object ExtractWords {
         }
 
         var clip0: Area = null
-        for (fd <- 0 until fadeSize) {
+        if (!w.erase) for (fd <- 0 until fadeSize) {
           import numbers.Implicits._
           val alpha = fd.linlin(0, fadeSize, 1.0, 0.0)
           val clip1 = mkFadeShape(fd, basicShape)
@@ -151,13 +157,20 @@ object ExtractWords {
             res
           }
           gOut.setClip(clip2)
-          val colr = new Color(0xFF, 0, 0, (alpha * 0xFF).toInt)
-          gOut.setColor(colr)
-          gOut.fillRect(0, 0, imgOutW, imgOutH)
+//          val colr = new Color(0xFF, 0, 0, (alpha * 0xFF).toInt)
+//          gOut.setColor(colr)
+//          gOut.fillRect(0, 0, imgOutW, imgOutH)
+          val tx0 = -w.bounds.getMinX * imageScale
+          val tx  = tx0 + fadeSizeH
+          val ty0 = -w.baseline * imageScale
+          val ty  = ty0 + imgOutH - descent + fadeSizeH
+          at.setToTranslation(tx, ty)
+          val comp = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha.toFloat)
+          gOut.setComposite(comp)
+          gOut.drawImage(bufImgIn, at, null)
           clip0 = clip1
         }
 
-        //      gOut.drawImage(bufImgIn, at, null)
         ImageIO.write(bufImgOut, fmt, outF)
         gOut.dispose()
         bufImgOut.flush()
