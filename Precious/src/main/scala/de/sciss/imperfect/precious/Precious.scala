@@ -33,9 +33,12 @@ object Precious {
   val cfgCup2 = Config(index = 9947, cx = 1972 - 5, cy = 2632 + 10, diam = 2400,
     levelsLo = 19, levelsHi = 233, gamma = 0.8,
     startAngle = 0.0, angleSpan = 2.222 * 360, numFrames = 24 * 60 * 2)
+  val cfgCup3 = Config(index = 9941, cx = 2724, cy = 1436, diam = 2030,
+    levelsLo = 19, levelsHi = 233, gamma = 0.8,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = 24 * 60 * 1)
 
   def main(args: Array[String]): Unit = {
-    run(cfgCup2)
+    run(cfgCup3)
   }
 
   def applyLevels(in: GE, lo: Int, hi: Int, hasAlpha: Boolean = false): GE = if (lo == 0 && hi == 255) in else {
@@ -88,8 +91,8 @@ object Precious {
 
       val cx0       = config.cx // 1972 // 1947
       val cy0       = config.cy // 2632 // 2700
-      val cxIn      = -cy0
-      val cyIn      = widthIn0 - cx0
+      val cxIn      = cx0 // -cy0
+      val cyIn      = cy0 // widthIn0 - cx0
 
       val cxOut     = widthOut  * 0.5
       val cyOut     = heightOut * 0.5
