@@ -36,6 +36,9 @@ object Precious {
   val cfgPhone1 = Config(index = 9941, cx = 2724, cy = 1436, diam = 2030,
     levelsLo = 19, levelsHi = 233, gamma = 0.8,
     startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = 24 * 60 * 1)
+  val cfgPhone2 = Config(index = 9942, cx = 2724 + 2, cy = 1436 - 8, diam = 2030,
+    levelsLo = 19, levelsHi = 233, gamma = 0.8,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = 24 * 60 * 1)
   val cfgShoe1 = Config(index = 9945, cx = 2600, cy = 1752, diam = 1810,
     levelsLo = 19, levelsHi = 233, gamma = 0.95,
     startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.8).toInt)
@@ -50,7 +53,7 @@ object Precious {
     startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.7).toInt)
   
   def main(args: Array[String]): Unit = {
-    run(cfgPen1)
+    run(cfgPhone2)
   }
 
   def applyLevels(in: GE, lo: Int, hi: Int, hasAlpha: Boolean = false): GE = if (lo == 0 && hi == 255) in else {
