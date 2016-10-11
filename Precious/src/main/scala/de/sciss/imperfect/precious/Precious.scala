@@ -27,18 +27,30 @@ object Precious {
                     levelsLo: Int = 0, levelsHi: Int = 255, gamma: Double = 1.0,
                     startAngle: Double, angleSpan: Double, numFrames: Int)
 
-  val cfgCup1 = Config(index = 9948, cx = 1972, cy = 2632, diam = 2400,
+  val cfgCup1 = Config(index = 9948, cx = 1972, cy = 2632, diam = 2400,  // XXX TODO, cx, cy wrong
     levelsLo = 19, levelsHi = 233, gamma = 1.0,
-    startAngle = 0.0, angleSpan = 2.222 * 360, numFrames = 24 * 60 * 2)
+    startAngle = 0.0, angleSpan = 2.222 * 360, numFrames = 24 * 60 * 2)  // XXX TODO, cx, cy wrong
   val cfgCup2 = Config(index = 9947, cx = 1972 - 5, cy = 2632 + 10, diam = 2400,
     levelsLo = 19, levelsHi = 233, gamma = 0.8,
     startAngle = 0.0, angleSpan = 2.222 * 360, numFrames = 24 * 60 * 2)
-  val cfgCup3 = Config(index = 9941, cx = 2724, cy = 1436, diam = 2030,
+  val cfgPhone1 = Config(index = 9941, cx = 2724, cy = 1436, diam = 2030,
     levelsLo = 19, levelsHi = 233, gamma = 0.8,
     startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = 24 * 60 * 1)
-
+  val cfgShoe1 = Config(index = 9945, cx = 2600, cy = 1752, diam = 1810,
+    levelsLo = 19, levelsHi = 233, gamma = 0.95,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.8).toInt)
+  val cfgShoe2 = Config(index = 9946, cx = 2600 - 2, cy = 1752 - 7, diam = 1810,
+    levelsLo = 19, levelsHi = 233, gamma = 0.90,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.8).toInt)
+  val cfgPen1 = Config(index = 9949, cx = 2610, cy = 1521, diam = 1900,
+    levelsLo = 12, levelsHi = 233, gamma = 0.90,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.7).toInt)
+  val cfgPen2 = Config(index = 9950, cx = 2610 + 3, cy = 1521 + 4, diam = 1900,
+    levelsLo = 12, levelsHi = 233, gamma = 0.85	,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.7).toInt)
+  
   def main(args: Array[String]): Unit = {
-    run(cfgCup3)
+    run(cfgPen1)
   }
 
   def applyLevels(in: GE, lo: Int, hi: Int, hasAlpha: Boolean = false): GE = if (lo == 0 && hi == 255) in else {
