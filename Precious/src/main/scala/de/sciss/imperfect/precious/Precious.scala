@@ -49,11 +49,17 @@ object Precious {
     levelsLo = 12, levelsHi = 233, gamma = 0.90,
     startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.7).toInt)
   val cfgPen2 = Config(index = 9950, cx = 2610 + 3, cy = 1521 + 4, diam = 1900,
-    levelsLo = 12, levelsHi = 233, gamma = 0.85	,
+    levelsLo = 12, levelsHi = 233, gamma = 0.85,
     startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.7).toInt)
+  val cfgInk1 = Config(index = 9954, cx = 2695, cy = 1540, diam = 2170,
+    levelsLo = 19, levelsHi = 233, gamma = 0.90,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.9).toInt)
+  val cfgInk2 = Config(index = 9955, cx = 2695 + 4, cy = 1540 - 2, diam = 2170,
+    levelsLo = 19, levelsHi = 233, gamma = 0.90,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.9).toInt)
   
   def main(args: Array[String]): Unit = {
-    run(cfgPhone2)
+    run(cfgInk1)
   }
 
   def applyLevels(in: GE, lo: Int, hi: Int, hasAlpha: Boolean = false): GE = if (lo == 0 && hi == 255) in else {
