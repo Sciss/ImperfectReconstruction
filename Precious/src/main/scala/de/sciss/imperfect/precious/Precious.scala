@@ -63,9 +63,15 @@ object Precious {
   val cfgTile2 = Config(index = 9952, cx = 2508 - 8, cy = 1650 + 5, diam = 2290,
     levelsLo = 19, levelsHi = 233, gamma = 1.10,
     startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 1.2).toInt)
+  val cfgRing1 = Config(index = 9957, cx = 2618, cy = 1529, diam = (2860 * math.sqrt(0.5)).toInt,
+    levelsLo = 0, levelsHi = 255, gamma = 1.0,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 1.1).toInt)
+  val cfgRing2 = Config(index = 9958, cx = 2618 + 1, cy = 1529 + 7, diam = (2860 * math.sqrt(0.5)).toInt,
+    levelsLo = 0, levelsHi = 255, gamma = 1.0,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 1.1).toInt)
   
   def main(args: Array[String]): Unit = {
-    run(cfgInk1)
+    run(cfgRing1)
   }
 
   def applyLevels(in: GE, lo: Int, hi: Int, hasAlpha: Boolean = false): GE = if (lo == 0 && hi == 255) in else {
