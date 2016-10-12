@@ -57,6 +57,12 @@ object Precious {
   val cfgInk2 = Config(index = 9955, cx = 2695 + 4, cy = 1540 - 2, diam = 2170,
     levelsLo = 19, levelsHi = 233, gamma = 0.90,
     startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.9).toInt)
+  val cfgTile1 = Config(index = 9951, cx = 2508, cy = 1650, diam = 2290,
+    levelsLo = 19, levelsHi = 233, gamma = 0.80,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 1.2).toInt)
+  val cfgTile2 = Config(index = 9952, cx = 2508 - 8, cy = 1650 + 5, diam = 2290,
+    levelsLo = 19, levelsHi = 233, gamma = 1.10,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 1.2).toInt)
   
   def main(args: Array[String]): Unit = {
     run(cfgInk1)
