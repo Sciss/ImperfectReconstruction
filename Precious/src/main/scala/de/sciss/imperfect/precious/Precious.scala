@@ -75,9 +75,15 @@ object Precious {
   val cfgEmpty2 = Config(index = 9959, cx = 2362, cy = 1852, diam = (2222 * math.sqrt(0.5)).toInt,
     levelsLo = 70, levelsHi = 230, gamma = 0.90,
     startAngle = -0.70, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.611).toInt)
+  val cfgGlass1 = Config(index = 9991, cx = 3344, cy = 1592, diam = (3050 * math.sqrt(0.5)).toInt,
+    levelsLo = 60, levelsHi = 233, gamma = 0.90,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.611).toInt)
+  val cfgGlass2 = Config(index = 9994, cx = 3344 - 352, cy = 1592 - 33, diam = (3050 * math.sqrt(0.5)).toInt,
+    levelsLo = 60, levelsHi = 233, gamma = 0.90,
+    startAngle = 0.0, angleSpan = 1.0 * 360, numFrames = (24 * 60 * 0.611).toInt)
   
   def main(args: Array[String]): Unit = {
-    run(cfgEmpty2)
+    run(cfgGlass1)
   }
 
   def applyLevels(in: GE, lo: Int, hi: Int, hasAlpha: Boolean = false): GE = if (lo == 0 && hi == 255) in else {
