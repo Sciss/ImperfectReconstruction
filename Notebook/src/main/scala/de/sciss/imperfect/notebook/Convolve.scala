@@ -355,9 +355,11 @@ final class Convolve(config: Convolve.Config) {
 //          g4.drawImage(i1, x - kh + 3, y - kh + 3, x + kh - 6, y + kh - 6, x - kh, y - kh, x + kh, y + kh, null)
 //          g4.drawImage(i1, x - kh + 6, y - kh + 6, x + kh - 6, y + kh - 6, x - kh, y - kh, x + kh, y + kh, null)
 //          g4.drawImage(i1, x - kh + 7, y - kh + 7, x + kh - 7, y + kh - 7, x - kh, y - kh, x + kh, y + kh, null)
-          g4.drawImage(i1, x - kh, y - kh, x + kh - 14, y + kh - 14, x - kh, y - kh, x + kh, y + kh, null)
+//          g4.drawImage(i1, x - kh, y - kh, x + kh - 14, y + kh - 14, x - kh, y - kh, x + kh, y + kh, null)
+          g4.drawImage(i1, x - kh, y - kh, x + kh - 15, y + kh - 15, x - kh, y - kh, x + kh, y + kh, null)
 //          g4.setColor(new Color(255, 255, 255, 128))
-          g4.setColor(new Color(Random.nextInt(255), Random.nextInt(255), Random.nextInt(255), Random.nextInt(255)))
+//          g4.setColor(new Color(Random.nextInt(255), Random.nextInt(255), Random.nextInt(255), Random.nextInt(255)))
+          g4.setColor(new Color(Random.nextInt(128) + 127, Random.nextInt(128) + 127, Random.nextInt(128) + 127, Random.nextInt(128) + 127))
           g4.fillRect(x, y, 1, 1)
           extractChannel2(i4, arr = b1, x = x - kh, y = y - kh, w = kernel, h = kernel, chan = chan)
 
