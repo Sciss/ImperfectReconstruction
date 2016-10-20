@@ -21,7 +21,7 @@ import javax.imageio.ImageIO
 import de.sciss.dsp
 import de.sciss.file._
 import de.sciss.numbers.Implicits._
-import de.sciss.synth.io.AudioFile
+import de.sciss.synth.io.{AudioFile, AudioFileSpec}
 import edu.emory.mathcs.jtransforms.fft.DoubleFFT_2D
 
 import scala.util.Random
@@ -32,7 +32,8 @@ object Convolve extends App {
                     frameOffA: Int = 0, frameOffB: Int = 0, gamma: Double = 0.5, kernel: Int = 32,
                     agcLag: Double = 0.9, noise: Double = 1.0, winSize: Int = 4, rotateB: Boolean = false,
                     shiftB: Int = 0, filter: Option[File] = None,
-                    width: Int = 0, height: Int = 0)
+                    width: Int = 0, height: Int = 0,
+                    fadeLen: Int = 24)
 
   val p = new scopt.OptionParser[Config]("Anemone Convolve") {
     arg[File]("input-a")
@@ -101,7 +102,7 @@ object Convolve extends App {
       .action   { (v, c) => c.copy(width = v) }
 
     opt[Int] ('h', "height")
-      .text ("Enforce image heiht")
+      .text ("Enforce image height")
       .action   { (v, c) => c.copy(height = v) }
 
     opt[Unit] ('r', "rotate")
@@ -111,6 +112,10 @@ object Convolve extends App {
     opt[Int] ('y', "shift-y")
       .text ("Vertical offset of second image. Default: 0")
       .action   { (v, c) => c.copy(shiftB = v) }
+
+    opt[Int] ("fade-len")
+      .text ("Frames per fade. Default: 24")
+      .action   { (v, c) => c.copy(fadeLen = v) }
   }
   p.parse(args, Config()).fold(sys.exit(1)) { config =>
     new Convolve(config)
@@ -233,7 +238,7 @@ final class Convolve(config: Convolve.Config) {
     }
   }
 
-  import config.{kernel, winSize}
+  import config.{kernel, winSize, fadeLen}
 
   private[this] val fft       = new DoubleFFT_2D(kernel, kernel)
   private[this] val gammaInv  = 1.0/config.gamma
@@ -266,6 +271,10 @@ final class Convolve(config: Convolve.Config) {
       }
     }
     fft.realForward(bFlt)
+//    val afTemp = AudioFile.openWrite(userHome/"Documents"/"temp"/"filt-fft.aif", AudioFileSpec(numChannels = 1, sampleRate = 44100))
+//    afTemp.write(Array(bFlt.flatten.map(_.toFloat)))
+//    afTemp.close()
+
     bFlt
   }
 
