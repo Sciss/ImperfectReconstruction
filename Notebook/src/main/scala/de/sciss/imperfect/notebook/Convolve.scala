@@ -352,7 +352,9 @@ final class Convolve(config: Convolve.Config) {
 
 //          g4.drawImage(i1, x - kh/2, y - kh/2, x + kh/2, y + kh/2, x - kh, y - kh, x + kh, y + kh, null)
 //          g4.drawImage(i1, x - kh + 2, y - kh + 2, x + kh - 4, y + kh - 4, x - kh, y - kh, x + kh, y + kh, null)
-          g4.drawImage(i1, x - kh + 3, y - kh + 3, x + kh - 6, y + kh - 6, x - kh, y - kh, x + kh, y + kh, null)
+//          g4.drawImage(i1, x - kh + 3, y - kh + 3, x + kh - 6, y + kh - 6, x - kh, y - kh, x + kh, y + kh, null)
+//          g4.drawImage(i1, x - kh + 6, y - kh + 6, x + kh - 6, y + kh - 6, x - kh, y - kh, x + kh, y + kh, null)
+          g4.drawImage(i1, x - kh + 7, y - kh + 7, x + kh - 7, y + kh - 7, x - kh, y - kh, x + kh, y + kh, null)
 //          g4.setColor(new Color(255, 255, 255, 128))
           g4.setColor(new Color(Random.nextInt(255), Random.nextInt(255), Random.nextInt(255), Random.nextInt(255)))
           g4.fillRect(x, y, 1, 1)
