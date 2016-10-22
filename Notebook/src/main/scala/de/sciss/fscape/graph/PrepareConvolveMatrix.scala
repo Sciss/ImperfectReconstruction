@@ -17,6 +17,8 @@ import de.sciss.fscape.stream.{StreamIn, StreamOut}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
+// cf. https://github.com/mlevans/pretty-heatmaps
+// https://github.com/sergbas/ImageProcessor/blob/master/app/src/main/java/demo/apps/imageprocessor/filters/BicubicFilter.java
 final case class PrepareConvolveMatrix(in: GE, rows: GE, columns: GE, kernel: GE, step: GE)
   extends UGenSource.SingleOut {
 

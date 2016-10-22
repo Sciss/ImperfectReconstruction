@@ -16,21 +16,21 @@ package de.sciss.imperfect.notebook
 import de.sciss.file._
 import de.sciss.fscape.gui.SimpleGUI
 import de.sciss.fscape.stream.Control
-import de.sciss.fscape.{Graph, graph}
+import de.sciss.fscape.{GE, Graph, graph}
 
 import scala.Predef.{any2stringadd => _, _}
 import scala.swing.Swing
 
 object ConvolveFSc {
-  final case class Config(kernel: Int = 16, noiseAmp: Double = 0.1, width: Int = 512, height: Int = 512)
+  final case class Config(kernel: Int = 16, noiseAmp: Double = 0.1, width: Int = 1024, height: Int = 1024)
 
   def main(args: Array[String]): Unit = run(Config())
 
   def run(config: Config): Unit = {
     import config._
     val dir       = userHome / "Documents" / "projects" / "Imperfect" / "scans" /"notebook2016"
-    val fIn1      = dir / "universe-test1q.png"
-    val fIn2      = dir / "universe-test2q.png"
+    val fIn1      = dir / "universe-test1.png"
+    val fIn2      = dir / "universe-test2.png"
     val fFltIn    = dir / s"hp5-fft2d-$kernel.aif"
     val fOut      = dir / "universe-fscape-out.png"
 
@@ -53,15 +53,21 @@ object ConvolveFSc {
       val fltIn     = AudioFileIn(fFltIn, numChannels = 1)  // already FFT'ed
       val kernelS   = kernel * kernel
       val fltRepeat = RepeatWindow(fltIn, kernelS, num = frameSize)
-      // Plot1D(fltRepeat, kernelS)
 
       val m1        = MatrixInMatrix(i1, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
       val m2        = MatrixInMatrix(i2, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
-      val m1f       = Real2FFT(m1, rows = kernel, columns = kernel)
-      val m2f       = Real2FFT(m2, rows = kernel, columns = kernel)
+
+      val m1a       = AffineTransform2D.scale(in = m1, widthIn = kernel, heightIn = kernel,
+        sx = 0.2, sy = 0.2, zeroCrossings = 0, wrap = 0)
+
+      val m1n       = ResizeWindow(WhiteNoise(Seq[GE](1, 1, 1)), size = 1, start = 0, stop = kernelS - 1)
+      val m1x       = m1a + (m1n * 24 + 104)
+
+      val m1f       = Real2FFT(m1x, rows = kernel, columns = kernel)
+      val m2f       = Real2FFT(m2 , rows = kernel, columns = kernel)
+
       val m3f       = (m1f.complex * m2f).complex * fltRepeat
       val m3        = Real2IFFT(m3f, rows = kernel, columns = kernel)
-//      val flt       = ResizeWindow(m3, size = kernelS, start = kernelS - 1)
       val flt       = ResizeWindow(m3, size = kernelS, stop = -(kernelS - 1))
       val i3        = flt
 
