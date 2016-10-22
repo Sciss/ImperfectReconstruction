@@ -30,6 +30,7 @@ object ExtractWords {
   case class Config(svgIn     : File    = file("in.svg"),
                     imageIn   : File    = file("in.jpg"),
                     outTemp   : File    = file("out-%d.png"),
+                    startIndex: Int     = 1,
                     imageScale: Double  = 5,
                     fadeSize  : Int     = 8,
                     background: Int     = 0x00FFFFFF,
@@ -44,9 +45,12 @@ object ExtractWords {
       opt[Double]("scale") text "Svg-to-image scale factor (default: 5)" action { (x, c) =>
         c.copy(imageScale = x)
       }
-      opt[Unit  ]("overwrite") required() text "Overwrite existing files" action { (_, c) => c.copy(overwrite = true) }
+      opt[Unit  ]("overwrite") text "Overwrite existing files" action { (_, c) => c.copy(overwrite = true) }
       opt[Int   ]("background") text "Background color (default: 0x00FFFFFF" action { (x, c) =>
         c.copy(background = x)
+      }
+      opt[Int   ]("start-index") text "Start index in output template (default: 1)" action { (x, c) =>
+        c.copy(startIndex = x)
       }
     }
     parser.parse(args, Config()).fold(sys.exit(1))(run)
@@ -64,10 +68,11 @@ object ExtractWords {
     val pathsXML  = xmlRoot.\\("path")
     println(s"Seeing ${pathsXML.size} paths.")
     val (pathsBaselineXML, pathsWordXML) = pathsXML.partition(_.\("@style").text.contains("stroke:#0000ff"))
-    println(s"Seeing ${pathsWordXML.size} word paths, ${pathsBaselineXML.size} pathsBaseline paths.")
+    println(s"Seeing ${pathsWordXML.size} word paths, ${pathsBaselineXML.size} baseline paths.")
 
     val pathsWord       = mkPaths(pathsWordXML)
-    val erased          = pathsWordXML.map(n => (n\"@notebook").text.contains("-erase")).toVector
+    val text            = pathsWordXML.map(n => (n\"@notebook").text).toVector
+    val erased          = text.map(_.contains("-erase"))
     val boundsWord      = pathsWord.map(_.getBounds2D)
     val pathsBaseline   = mkPaths(pathsBaselineXML)
     val boundsBaseline  = pathsBaseline.map(_.getBounds2D)
@@ -102,6 +107,11 @@ object ExtractWords {
       Word(pIdx, path, bPath, baseline = baseline, erase = er)
     }
 
+    words.foreach { w =>
+      val x = (w.baseline - w.bounds.getMinY) * imageScale
+      if (x > 2000) println(s"OOOPS. $w - ${text.slice(w.idx - 1, w.idx + 2)}")
+    }
+
     val ascent  = words.map(w => w.baseline - w.bounds.getMinY).max * imageScale
     val descent = words.map(w => w.bounds.getMaxY - w.baseline).max * imageScale
     val imgOutH = math.ceil(ascent + descent).toInt + fadeSize
@@ -116,7 +126,7 @@ object ExtractWords {
     val fadeSizeH = 0.5 * fadeSize
 
     words.foreach { w =>
-      val outF = formatFile(outTemp, w.idx + 1)
+      val outF = formatFile(outTemp, w.idx + startIndex)
       if (!overwrite && outF.exists()) {
         println(s"Skipping '$outF' - file already exists")
       } else {
