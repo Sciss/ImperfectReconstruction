@@ -32,7 +32,7 @@ object ConvolveFSc {
   def applyLevels(in: GE, levels: Levels): GE = {
     import levels._
     val chans = r :: g :: b :: Nil
-    val rgb   = Seq(in \ 0, in \ 1, in \ 2): GE
+    val rgb   = in // Seq(in \ 0, in \ 1, in \ 2): GE
 //    val alpha = in \ 3
     val low   = chans.map(tup => tup._1 / 255.0: GE)
     val high  = chans.map(tup => tup._2 / 255.0: GE)
@@ -56,7 +56,8 @@ object ConvolveFSc {
     val tempIn        = groupInDir  / "notebook-p%d.png"
     val tempOut       = groupOutDir / "frame-%d.png"
     val tempInRange   = 1 to numPages
-    val tempOutRange  = 1 to ((2 * numPages + 1) * fadeFrames)
+    val numFrames     = (2 * numPages + 1) * fadeFrames
+    // val tempOutRange  = 1 to numFrames
 
     val fFltIn    = baseDir / s"hp5-fft2d-$kernel.aif"
 
@@ -170,9 +171,9 @@ object ConvolveFSc {
 
       val sig       = i4
       val specOut   = ImageFile.Spec(width = width, height = height, numChannels = 3)
-      val tempOutRangeGE = Frames(DC(0).take(tempOutRange.size))
+      val tempOutRangeGE = Frames(DC(0).take(numFrames))
       ImageFileSeqOut(tempOut, spec = specOut, in = sig, indices = tempOutRangeGE)
-      Progress(Frames(sig) / (frameSize.toLong * tempOutRange.size), Metro(frameSize), label = "write")
+      Progress(Frames(sig \ 0) / (frameSize.toLong * numFrames), Metro(frameSize), label = "write")
     }
 
     val ctl = Control(cfg)
