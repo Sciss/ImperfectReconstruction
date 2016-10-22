@@ -34,6 +34,8 @@ object ExtractWords {
                     imageScale: Double  = 5,
                     fadeSize  : Int     = 8,
                     background: Int     = 0x00FFFFFF,
+                    ascent    : Int     = 0,
+                    descent   : Int     = 0,
                     overwrite : Boolean = false
                    )
 
@@ -51,6 +53,12 @@ object ExtractWords {
       }
       opt[Int   ]("start-index") text "Start index in output template (default: 1)" action { (x, c) =>
         c.copy(startIndex = x)
+      }
+      opt[Int   ]("ascent") text "Enforce ascent (default: 0 -- automatically calculate ascent)" action { (x, c) =>
+        c.copy(ascent = x)
+      }
+      opt[Int   ]("descent") text "Enforce descent (default: 0 -- automatically calculate descent)" action { (x, c) =>
+        c.copy(descent = x)
       }
     }
     parser.parse(args, Config()).fold(sys.exit(1))(run)
@@ -71,7 +79,7 @@ object ExtractWords {
     println(s"Seeing ${pathsWordXML.size} word paths, ${pathsBaselineXML.size} baseline paths.")
 
     val pathsWord       = mkPaths(pathsWordXML)
-    val text            = pathsWordXML.map(n => (n\"@notebook").text).toVector
+    val text            = pathsWordXML.map(n => (n\"@notebook").text.trim).toVector
     val erased          = text.map(_.contains("-erase"))
     val boundsWord      = pathsWord.map(_.getBounds2D)
     val pathsBaseline   = mkPaths(pathsBaselineXML)
@@ -112,10 +120,12 @@ object ExtractWords {
       if (x > 2000) println(s"OOOPS. $w - ${text.slice(w.idx - 1, w.idx + 2)}")
     }
 
-    val ascent  = words.map(w => w.baseline - w.bounds.getMinY).max * imageScale
-    val descent = words.map(w => w.bounds.getMaxY - w.baseline).max * imageScale
-    val imgOutH = math.ceil(ascent + descent).toInt + fadeSize
-    println(s"ascent $ascent, descent $descent, imgOutH $imgOutH")
+    val ascentW   = words.map(w => w.baseline - w.bounds.getMinY).max * imageScale
+    val descentW  = words.map(w => w.bounds.getMaxY - w.baseline).max * imageScale
+    val ascentC   = if (ascent  == 0) ascentW  else ascent
+    val descentC  = if (descent == 0) descentW else descent
+    val imgOutH   = math.ceil(ascentC + descentC).toInt + fadeSize
+    println(s"ascent $ascentC, descent $descentC, imgOutH $imgOutH")
 
     require (imageIn.isFile, s"Input image '$imageIn' not found.")
     val bufImgIn  = ImageIO.read(imageIn)
@@ -141,7 +151,7 @@ object ExtractWords {
         at.scale     (imageScale, imageScale)
         at.translate (-w.bounds.getMinX, -w.baseline /* -w.bounds.getMinY */)
         val scaled    = at.createTransformedShape(w.path)
-        at.setToTranslation(fadeSizeH, imgOutH - descent /* + descent0 */ + fadeSizeH)
+        at.setToTranslation(fadeSizeH, imgOutH - descentC /* + descent0 */ + fadeSizeH)
         val basicShape = at.createTransformedShape(scaled)
 
         def mkFadeShape(fd: Int, in: Shape): Area = {
@@ -175,7 +185,7 @@ object ExtractWords {
           val tx0 = -w.bounds.getMinX * imageScale
           val tx  = tx0 + fadeSizeH
           val ty0 = -w.baseline * imageScale
-          val ty  = ty0 + imgOutH - descent + fadeSizeH
+          val ty  = ty0 + imgOutH - descentC + fadeSizeH
           at.setToTranslation(tx, ty)
           val comp = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha.toFloat)
           gOut.setComposite(comp)
