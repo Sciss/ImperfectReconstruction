@@ -22,8 +22,8 @@ import scala.Predef.{any2stringadd => _, _}
 import scala.swing.Swing
 
 object ConvolveFSc {
-  final case class Config(kernel: Int = 16, noiseAmp: Double = 0.1, width: Int = 1024, height: Int = 1024,
-                          groupIdx: Int = 1, fadeFrames: Int = 24 /* * 14 */)
+  final case class Config(kernel: Int = 16, noiseAmp: Double = 0.05, width: Int = 1024, height: Int = 1024,
+                          groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 24 * 4 - 10)
 
   def main(args: Array[String]): Unit = run(Config())
 
@@ -90,7 +90,7 @@ object ConvolveFSc {
       val imgSeqIn1L  = adjustLevels(imgSeqIn1)
       val imgSeqIn2L  = adjustLevels(imgSeqIn2)
 
-      val (inSeqRep1, inSeqRep2) = if (evenInRange.size < oddInRange.size) {
+      val (inSeqRep1a, inSeqRep2a) = if (evenInRange.size < oddInRange.size) {
         val _res1 = mkBlackFrames(fadeFrames) ++ RepeatWindow(imgSeqIn1L, size = frameSize, num = 4 * fadeFrames) ++
           mkBlackFrames(fadeFrames)
         val _res2 = RepeatWindow(imgSeqIn2L, size = frameSize, num = 4 * fadeFrames).drop(frameSize * fadeFrames)
@@ -99,17 +99,26 @@ object ConvolveFSc {
       } else {
         ???
       }
+      val inSeqRep1 = if (skipFrames == 0) inSeqRep1a else inSeqRep1a.drop(skipFrames * frameSize)
+      val inSeqRep2 = if (skipFrames == 0) inSeqRep2a else inSeqRep2a.drop(skipFrames * frameSize)
+      val numFramesS = numFrames - skipFrames
 
       val fltIn     = AudioFileIn(fFltIn, numChannels = 1)  // already FFT'ed
       val kernelS   = kernel * kernel
-      val fltRepeat = RepeatWindow(fltIn, size = kernelS, num = frameSize * numFrames)
+      val fltRepeat = RepeatWindow(fltIn, size = kernelS, num = frameSize * numFramesS)
 
       val periodFrames = fadeFrames * 4
 
-      def mkSaw(phase: Double): GE = {
+      def mkSawLow(phase: Double): GE = {
         val lfSaw   = LFSaw(1.0/periodFrames, phase = phase)
         val lfSawUp = (lfSaw + (1: GE)) * 2
-        val low     = lfSawUp.min(1) - (lfSawUp - 3).max(0)
+        val low0    = lfSawUp.min(1) - (lfSawUp - 3).max(0)
+        val low     = if (skipFrames == 0) low0 else low0.drop(skipFrames)
+        low
+      }
+
+      def mkSaw(phase: Double): GE = {
+        val low     = mkSawLow(phase)
         val rep1    = RepeatWindow(low , size = 1, num = frameSize)
         rep1
       }
@@ -120,21 +129,22 @@ object ConvolveFSc {
         rep2
       }
       
-      val env1Mat   = mkSawMat(0.75)
-      val env2Mat   = mkSawMat(0.25)
+      val env1Mat   = mkSawLow(0.75)
+      val env2Mat   = mkSawLow(0.25)
 
       val m1        = MatrixInMatrix(inSeqRep1, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
       val m2        = MatrixInMatrix(inSeqRep2, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
 
-//      m1.poll(Metro(frameSize/8), "m1")
-//      m2.poll(Metro(frameSize/8), "m2")
-
       val scale1    = env1Mat.linexp(1, 0, 1, 0.01)
       val scale2    = env2Mat.linexp(1, 0, 1, 0.01)
+      val ampMat1l  = env1Mat.pow(1.0/8)
+      val ampMat2l  = env2Mat.pow(1.0/8)
+      val ampMat1   = RepeatWindow(ampMat1l, size = 1, num = frameSize * kernelS)
+      val ampMat2   = RepeatWindow(ampMat2l, size = 1, num = frameSize * kernelS)
       val m1a       = AffineTransform2D.scale(in = m1, widthIn = kernel, heightIn = kernel,
-        sx = scale1, sy = scale1, zeroCrossings = 0, wrap = 0)
+        sx = scale1, sy = scale1, zeroCrossings = 0, wrap = 0) * ampMat1
       val m2a       = AffineTransform2D.scale(in = m2, widthIn = kernel, heightIn = kernel,
-        sx = scale2, sy = scale2, zeroCrossings = 0, wrap = 0)
+        sx = scale2, sy = scale2, zeroCrossings = 0, wrap = 0) * ampMat2
 //      val m1a = m1
 //      val m2a = m2
 
@@ -142,18 +152,23 @@ object ConvolveFSc {
       val m1ab      = m1a // BufferDisk(m1a)
       val m2ab      = m2a // BufferDisk(m2a)
 
-      val env1      = mkSaw(0.75)
-      val env2      = mkSaw(0.25)
+      val env1      = mkSawLow(0.75)
+      val env2      = mkSawLow(0.25)
 
-      val env1p     = env1.pow(4)
-      val env2p     = env2.pow(4)
-      val noiseAmp1 = env1p.linlin(1, 0, 0,  24)
-      val noiseDC1  = env1p.linlin(1, 0, 0, 104)
-      val noiseAmp2 = env2p.linlin(1, 0, 0,  24)
-      val noiseDC2  = env2p.linlin(1, 0, 0, 104)
+      val env1p     = env1.pow(16)
+      val env2p     = env2.pow(16)
+      val noiseAmp1l= 1 - env1p  // env1p.linlin(1, 0, 0, 1 /* 24 */)
+//      val noiseDC1l = noiseAmp1l // env1p.linlin(1, 0, 0, 1 /* 24 */ /* 104 */)
+      val noiseAmp2l= 1 - env2p  // env2p.linlin(1, 0, 0, 1 /* 24 */)
+ //     val noiseDC2l = noiseAmp2l // env2p.linlin(1, 0, 0, 1 /* 24 */ /* 104 */)
+      val noiseAmp1 = RepeatWindow(noiseAmp1l, size = 1, num = frameSize)
+      val noiseAmp2 = RepeatWindow(noiseAmp2l, size = 1, num = frameSize)
+      val noiseDC1  = noiseAmp1 // RepeatWindow(noiseDC1l , size = 1, num = frameSize)
+      val noiseDC2  = noiseAmp2 // RepeatWindow(noiseDC2l , size = 1, num = frameSize)
 
       val noise1    = WhiteNoise(Seq[GE](noiseAmp1, noiseAmp1, noiseAmp1)) + noiseDC1
-      val m1n       = ResizeWindow(noise1, size = 1, start = 0, stop = kernelS - 1)
+//      val m1n       = ResizeWindow(noise1, size = 1, start = 0, stop = kernelS - 1)
+      val m1n       = ResizeWindow(noise1, size = 1, start = -kernelS/2, stop = kernelS/2)
       val m1x       = m1ab + m1n // (m1n * 24 + (104: GE))
 
       val noise2    = WhiteNoise(Seq[GE](noiseAmp2, noiseAmp2, noiseAmp2)) + noiseDC2
@@ -167,44 +182,19 @@ object ConvolveFSc {
       val m3        = Real2IFFT(m3f, rows = kernel, columns = kernel)
       val flt       = ResizeWindow(m3, size = kernelS, stop = -(kernelS - 1))
       val i3        = flt
-//      val i3        = BufferDisk(flt)
 
-//      BufferDisk(m1f \ 0).poll(Metro(frameSize/8), "m1f")
-//      BufferDisk(flt \ 0).poll(Metro(frameSize/8), "flt")
-//      (flt \ 0).poll(Metro(frameSize/4), "flt")
-
-      //      Progress(Frames(i3) / (2 * frameSize), Metro(width), label = "ifft")
-
-//      val frameTr1  = Metro(frameSize)
-//      // val frameTr2  = Metro(frameSize)
-//      val maxR      = RunningMax(i3, trig = frameTr1).drop(frameSize - 1)
-//      val minR      = RunningMin(i3, trig = frameTr1).drop(frameSize - 1)
-//      val maxRDec   = ResizeWindow(maxR, frameSize, start = 0, stop = -(frameSize - 1))
-//      val minRDec   = ResizeWindow(minR, frameSize, start = 0, stop = -(frameSize - 1))
-//      val maxLag    = OnePole(maxRDec, 1 - 1.0 / 24)
-//      val minLag    = OnePole(minRDec, 1 - 1.0 / 24)
-//      val mul       = (maxLag - minLag).max(0.05).reciprocal
-//      val add       = -minLag.elastic(3)
-//      val mulR      = RepeatWindow(mul, size = 1, num = frameSize)
-//      val addR      = RepeatWindow(add, size = 1, num = frameSize)
-//      val i3e       = i3.elastic(frameSize * 6 / cfg.blockSize + 1)
-////      val i3e       = BufferDisk(i3)
-//
-//      (addR \ 0).poll(Metro(frameSize), "add")
-//      (mulR \ 0).poll(Metro(frameSize), "mul")
-//
-//      val i4        = ((i3e + addR) * mulR + noise).max(0).min(1)
-      val noise = WhiteNoise(noiseAmp)
-      val i3g   = ARCWindow(i3, size = frameSize, lag = 1.0 - 1.0/24)
-      val i4    = (i3g + noise).max(0.0).min(1.0)
+      val noise     = WhiteNoise(noiseAmp)
+      val i3g       = ARCWindow(i3, size = frameSize, lag = 1.0 - 1.0/(24/2))
+      val i4        = (i3g + noise).max(0.0).min(1.0)
 
       (i4 \ 0).poll(Metro(frameSize), "frame-done")
 
       val sig       = i4
       val specOut   = ImageFile.Spec(width = width, height = height, numChannels = 3)
-      val tempOutRangeGE = Frames(DC(0).take(numFrames))
+      val tempOutRangeGE0 = Frames(DC(0).take(numFramesS))
+      val tempOutRangeGE = if (skipFrames == 0) tempOutRangeGE0 else tempOutRangeGE0 + (skipFrames: GE)
       ImageFileSeqOut(tempOut, spec = specOut, in = sig, indices = tempOutRangeGE)
-      Progress(Frames(sig \ 0) / (frameSize.toLong * numFrames), Metro(frameSize), label = "write")
+      Progress(Frames(sig \ 0) / (frameSize.toLong * numFramesS), Metro(frameSize), label = "write")
     }
 
     val ctl = Control(cfg)
