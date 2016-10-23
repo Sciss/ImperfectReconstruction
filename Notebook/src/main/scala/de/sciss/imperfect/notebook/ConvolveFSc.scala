@@ -135,12 +135,14 @@ object ConvolveFSc {
       val m1        = MatrixInMatrix(inSeqRep1, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
       val m2        = MatrixInMatrix(inSeqRep2, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
 
-      val scale1    = env1Mat.linexp(1, 0, 1, 0.01)
-      val scale2    = env2Mat.linexp(1, 0, 1, 0.01)
+      val scale1l   = env1Mat.linexp(1, 0, 1, 0.5/kernel /* 0.01 */)
+      val scale2l   = env2Mat.linexp(1, 0, 1, 0.5/kernel /* 0.01 */)
       val ampMat1l  = env1Mat.pow(1.0/8)
       val ampMat2l  = env2Mat.pow(1.0/8)
       val ampMat1   = RepeatWindow(ampMat1l, size = 1, num = frameSize * kernelS)
       val ampMat2   = RepeatWindow(ampMat2l, size = 1, num = frameSize * kernelS)
+      val scale1    = RepeatWindow(scale1l , size = 1, num = frameSize * kernelS)
+      val scale2    = RepeatWindow(scale2l , size = 1, num = frameSize * kernelS)
       val m1a       = AffineTransform2D.scale(in = m1, widthIn = kernel, heightIn = kernel,
         sx = scale1, sy = scale1, zeroCrossings = 0, wrap = 0) * ampMat1
       val m2a       = AffineTransform2D.scale(in = m2, widthIn = kernel, heightIn = kernel,
@@ -155,8 +157,8 @@ object ConvolveFSc {
       val env1      = mkSawLow(0.75)
       val env2      = mkSawLow(0.25)
 
-      val env1p     = env1.pow(16)
-      val env2p     = env2.pow(16)
+      val env1p     = env1.pow(8)
+      val env2p     = env2.pow(8)
       val noiseAmp1l= 1 - env1p  // env1p.linlin(1, 0, 0, 1 /* 24 */)
 //      val noiseDC1l = noiseAmp1l // env1p.linlin(1, 0, 0, 1 /* 24 */ /* 104 */)
       val noiseAmp2l= 1 - env2p  // env2p.linlin(1, 0, 0, 1 /* 24 */)
