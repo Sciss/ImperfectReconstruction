@@ -80,10 +80,10 @@ object ConvolveFSc {
 
     val g = Graph {
       import graph._
-      val frameSize   = width * height
+      val frameSize   = width.toLong * height
       val (evenInRange, oddInRange) = tempInRange.partition(_ % 2 == 0)
 
-      def mkBlackFrames(num: Int): GE = DC(Seq[GE](0, 0, 0)).take(frameSize.toLong * num)
+      def mkBlackFrames(num: Int): GE = DC(Seq[GE](0, 0, 0)).take(frameSize * num)
 
       val imgSeqIn1   = ImageFileSeqIn(tempIn, indices = mkRangeGE(evenInRange), numChannels = 3)
       val imgSeqIn2   = ImageFileSeqIn(tempIn, indices = mkRangeGE(oddInRange ), numChannels = 3)
@@ -93,8 +93,8 @@ object ConvolveFSc {
       val (inSeqRep1, inSeqRep2) = if (evenInRange.size < oddInRange.size) {
         val _res1 = mkBlackFrames(fadeFrames) ++ RepeatWindow(imgSeqIn1L, size = frameSize, num = 4 * fadeFrames) ++
           mkBlackFrames(fadeFrames)
-        val _res2 = RepeatWindow(imgSeqIn2L, size = frameSize, num = 4 * fadeFrames).drop(frameSize.toLong * fadeFrames)
-          .take(frameSize.toLong * (oddInRange.size * 4 - 2) * fadeFrames)
+        val _res2 = RepeatWindow(imgSeqIn2L, size = frameSize, num = 4 * fadeFrames).drop(frameSize * fadeFrames)
+          .take(frameSize * (oddInRange.size * 4 - 2) * fadeFrames)
         (_res1, _res2)
       } else {
         ???
@@ -135,6 +135,12 @@ object ConvolveFSc {
         sx = scale1, sy = scale1, zeroCrossings = 0, wrap = 0)
       val m2a       = AffineTransform2D.scale(in = m2, widthIn = kernel, heightIn = kernel,
         sx = scale2, sy = scale2, zeroCrossings = 0, wrap = 0)
+//      val m1a = m1
+//      val m2a = m2
+
+      // (m1a \ 0).poll(Metro(frameSize/8), "m1a")
+      val m1ab      = m1a // BufferDisk(m1a)
+      val m2ab      = m2a // BufferDisk(m2a)
 
       val env1      = mkSaw(0.75)
       val env2      = mkSaw(0.25)
@@ -148,11 +154,11 @@ object ConvolveFSc {
 
       val noise1    = WhiteNoise(Seq[GE](noiseAmp1, noiseAmp1, noiseAmp1)) + noiseDC1
       val m1n       = ResizeWindow(noise1, size = 1, start = 0, stop = kernelS - 1)
-      val m1x       = m1a + m1n // (m1n * 24 + (104: GE))
+      val m1x       = m1ab + m1n // (m1n * 24 + (104: GE))
 
       val noise2    = WhiteNoise(Seq[GE](noiseAmp2, noiseAmp2, noiseAmp2)) + noiseDC2
       val m2n       = ResizeWindow(noise2, size = 1, start = 0, stop = kernelS - 1)
-      val m2x       = m2a + m2n // (m1n * 24 + (104: GE))
+      val m2x       = m2ab + m2n // (m1n * 24 + (104: GE))
 
       val m1f       = Real2FFT(m1x, rows = kernel, columns = kernel)
       val m2f       = Real2FFT(m2x, rows = kernel, columns = kernel)
@@ -161,8 +167,13 @@ object ConvolveFSc {
       val m3        = Real2IFFT(m3f, rows = kernel, columns = kernel)
       val flt       = ResizeWindow(m3, size = kernelS, stop = -(kernelS - 1))
       val i3        = flt
+//      val i3        = BufferDisk(flt)
 
-//      Progress(Frames(i3) / (2 * frameSize), Metro(width), label = "ifft")
+//      BufferDisk(m1f \ 0).poll(Metro(frameSize/8), "m1f")
+//      BufferDisk(flt \ 0).poll(Metro(frameSize/8), "flt")
+      (flt \ 0).poll(Metro(frameSize/8), "flt")
+
+      //      Progress(Frames(i3) / (2 * frameSize), Metro(width), label = "ifft")
 
       val frameTr1  = Metro(frameSize)
       // val frameTr2  = Metro(frameSize)
@@ -173,12 +184,19 @@ object ConvolveFSc {
       val maxLag    = OnePole(maxRDec, 1 - 1.0 / 24)
       val minLag    = OnePole(minRDec, 1 - 1.0 / 24)
       val mul       = (maxLag - minLag).max(0.05).reciprocal
-      val add       = -minLag
+      val add       = -minLag.elastic(3)
       val mulR      = RepeatWindow(mul, size = 1, num = frameSize)
       val addR      = RepeatWindow(add, size = 1, num = frameSize)
-      val i3e       = i3.elastic(frameSize * 2 / cfg.blockSize + 1)
-      val noise     = WhiteNoise(noiseAmp).elastic()
+      val i3e       = i3.elastic(frameSize * 6 / cfg.blockSize + 1)
+//      val i3e       = BufferDisk(i3)
+      val noise     = WhiteNoise(noiseAmp)
+
+      (addR \ 0).poll(Metro(frameSize), "add")
+      (mulR \ 0).poll(Metro(frameSize), "mul")
+
       val i4        = ((i3e + addR) * mulR + noise).max(0).min(1)
+
+      (i4  \ 0).poll(Metro(frameSize/8), "i4")
 
       val sig       = i4
       val specOut   = ImageFile.Spec(width = width, height = height, numChannels = 3)
