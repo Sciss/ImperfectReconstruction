@@ -68,8 +68,9 @@ object ConvolveFSc {
 
     var gui: SimpleGUI = null
     val cfg = Control.Config()
-    cfg.useAsync = false
-    cfg.progressReporter = p => Swing.onEDT(gui.progress = p.total)
+    cfg.useAsync          = false
+    cfg.blockSize         = 8192
+    cfg.progressReporter  = p => Swing.onEDT(gui.progress = p.total)
 
     def mkRangeGE(in: Seq[Int]): GE = in.map(x => x: GE).reduce(_ ++ _)
 
@@ -82,7 +83,7 @@ object ConvolveFSc {
       val frameSize   = width * height
       val (evenInRange, oddInRange) = tempInRange.partition(_ % 2 == 0)
 
-      def mkBlackFrame(): GE = DC(Seq[GE](0, 0, 0)).take(frameSize)
+      def mkBlackFrames(num: Int): GE = DC(Seq[GE](0, 0, 0)).take(frameSize.toLong * num)
 
       val imgSeqIn1   = ImageFileSeqIn(tempIn, indices = mkRangeGE(evenInRange), numChannels = 3)
       val imgSeqIn2   = ImageFileSeqIn(tempIn, indices = mkRangeGE(oddInRange ), numChannels = 3)
@@ -90,9 +91,10 @@ object ConvolveFSc {
       val imgSeqIn2L  = adjustLevels(imgSeqIn2)
 
       val (inSeqRep1, inSeqRep2) = if (evenInRange.size < oddInRange.size) {
-        val _res1 = mkBlackFrame() ++ RepeatWindow(imgSeqIn1L, size = frameSize, num = 4) ++ mkBlackFrame()
-        val _res2 = RepeatWindow(imgSeqIn2L, size = frameSize, num = 4).drop(frameSize)
-          .take(frameSize.toLong * (oddInRange.size * 4 - 2))
+        val _res1 = mkBlackFrames(fadeFrames) ++ RepeatWindow(imgSeqIn1L, size = frameSize, num = 4 * fadeFrames) ++
+          mkBlackFrames(fadeFrames)
+        val _res2 = RepeatWindow(imgSeqIn2L, size = frameSize, num = 4 * fadeFrames).drop(frameSize.toLong * fadeFrames)
+          .take(frameSize.toLong * (oddInRange.size * 4 - 2) * fadeFrames)
         (_res1, _res2)
       } else {
         ???
@@ -100,7 +102,7 @@ object ConvolveFSc {
 
       val fltIn     = AudioFileIn(fFltIn, numChannels = 1)  // already FFT'ed
       val kernelS   = kernel * kernel
-      val fltRepeat = RepeatWindow(fltIn, kernelS, num = frameSize)
+      val fltRepeat = RepeatWindow(fltIn, kernelS, num = frameSize * numFrames)
 
       val periodFrames = fadeFrames * 4
 
@@ -124,6 +126,9 @@ object ConvolveFSc {
       val m1        = MatrixInMatrix(inSeqRep1, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
       val m2        = MatrixInMatrix(inSeqRep2, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
 
+//      m1.poll(Metro(frameSize/8), "m1")
+//      m2.poll(Metro(frameSize/8), "m2")
+
       val scale1    = env1Mat.linexp(1, 0, 1, 0.01)
       val scale2    = env2Mat.linexp(1, 0, 1, 0.01)
       val m1a       = AffineTransform2D.scale(in = m1, widthIn = kernel, heightIn = kernel,
@@ -134,10 +139,12 @@ object ConvolveFSc {
       val env1      = mkSaw(0.75)
       val env2      = mkSaw(0.25)
 
-      val noiseAmp1 = env1.linlin(1, 0, 0,  24)
-      val noiseDC1  = env1.linlin(1, 0, 0, 104)
-      val noiseAmp2 = env2.linlin(1, 0, 0,  24)
-      val noiseDC2  = env2.linlin(1, 0, 0, 104)
+      val env1p     = env1.pow(4)
+      val env2p     = env2.pow(4)
+      val noiseAmp1 = env1p.linlin(1, 0, 0,  24)
+      val noiseDC1  = env1p.linlin(1, 0, 0, 104)
+      val noiseAmp2 = env2p.linlin(1, 0, 0,  24)
+      val noiseDC2  = env2p.linlin(1, 0, 0, 104)
 
       val noise1    = WhiteNoise(Seq[GE](noiseAmp1, noiseAmp1, noiseAmp1)) + noiseDC1
       val m1n       = ResizeWindow(noise1, size = 1, start = 0, stop = kernelS - 1)
@@ -158,16 +165,20 @@ object ConvolveFSc {
 //      Progress(Frames(i3) / (2 * frameSize), Metro(width), label = "ifft")
 
       val frameTr1  = Metro(frameSize)
-      val frameTr2  = Metro(frameSize)
+      // val frameTr2  = Metro(frameSize)
       val maxR      = RunningMax(i3, trig = frameTr1).drop(frameSize - 1)
       val minR      = RunningMin(i3, trig = frameTr1).drop(frameSize - 1)
-      val max       = Gate(maxR, gate = frameTr2)
-      val min       = Gate(minR, gate = frameTr2)
-      val mul       = (max - min).reciprocal
-      val add       = -min
-      val i3e       = i3.elastic(frameSize / cfg.blockSize + 1)
-      val noise     = WhiteNoise(noiseAmp)
-      val i4        = ((i3e + add) * mul + noise).max(0).min(1)
+      val maxRDec   = ResizeWindow(maxR, frameSize, start = 0, stop = -(frameSize - 1))
+      val minRDec   = ResizeWindow(minR, frameSize, start = 0, stop = -(frameSize - 1))
+      val maxLag    = OnePole(maxRDec, 1 - 1.0 / 24)
+      val minLag    = OnePole(minRDec, 1 - 1.0 / 24)
+      val mul       = (maxLag - minLag).max(0.05).reciprocal
+      val add       = -minLag
+      val mulR      = RepeatWindow(mul, size = 1, num = frameSize)
+      val addR      = RepeatWindow(add, size = 1, num = frameSize)
+      val i3e       = i3.elastic(frameSize * 2 / cfg.blockSize + 1)
+      val noise     = WhiteNoise(noiseAmp).elastic()
+      val i4        = ((i3e + addR) * mulR + noise).max(0).min(1)
 
       val sig       = i4
       val specOut   = ImageFile.Spec(width = width, height = height, numChannels = 3)
