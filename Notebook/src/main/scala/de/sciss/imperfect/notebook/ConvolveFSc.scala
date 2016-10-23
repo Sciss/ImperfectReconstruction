@@ -102,7 +102,7 @@ object ConvolveFSc {
 
       val fltIn     = AudioFileIn(fFltIn, numChannels = 1)  // already FFT'ed
       val kernelS   = kernel * kernel
-      val fltRepeat = RepeatWindow(fltIn, kernelS, num = frameSize * numFrames)
+      val fltRepeat = RepeatWindow(fltIn, size = kernelS, num = frameSize * numFrames)
 
       val periodFrames = fadeFrames * 4
 
@@ -171,32 +171,34 @@ object ConvolveFSc {
 
 //      BufferDisk(m1f \ 0).poll(Metro(frameSize/8), "m1f")
 //      BufferDisk(flt \ 0).poll(Metro(frameSize/8), "flt")
-      (flt \ 0).poll(Metro(frameSize/8), "flt")
+//      (flt \ 0).poll(Metro(frameSize/4), "flt")
 
       //      Progress(Frames(i3) / (2 * frameSize), Metro(width), label = "ifft")
 
-      val frameTr1  = Metro(frameSize)
-      // val frameTr2  = Metro(frameSize)
-      val maxR      = RunningMax(i3, trig = frameTr1).drop(frameSize - 1)
-      val minR      = RunningMin(i3, trig = frameTr1).drop(frameSize - 1)
-      val maxRDec   = ResizeWindow(maxR, frameSize, start = 0, stop = -(frameSize - 1))
-      val minRDec   = ResizeWindow(minR, frameSize, start = 0, stop = -(frameSize - 1))
-      val maxLag    = OnePole(maxRDec, 1 - 1.0 / 24)
-      val minLag    = OnePole(minRDec, 1 - 1.0 / 24)
-      val mul       = (maxLag - minLag).max(0.05).reciprocal
-      val add       = -minLag.elastic(3)
-      val mulR      = RepeatWindow(mul, size = 1, num = frameSize)
-      val addR      = RepeatWindow(add, size = 1, num = frameSize)
-      val i3e       = i3.elastic(frameSize * 6 / cfg.blockSize + 1)
-//      val i3e       = BufferDisk(i3)
-      val noise     = WhiteNoise(noiseAmp)
+//      val frameTr1  = Metro(frameSize)
+//      // val frameTr2  = Metro(frameSize)
+//      val maxR      = RunningMax(i3, trig = frameTr1).drop(frameSize - 1)
+//      val minR      = RunningMin(i3, trig = frameTr1).drop(frameSize - 1)
+//      val maxRDec   = ResizeWindow(maxR, frameSize, start = 0, stop = -(frameSize - 1))
+//      val minRDec   = ResizeWindow(minR, frameSize, start = 0, stop = -(frameSize - 1))
+//      val maxLag    = OnePole(maxRDec, 1 - 1.0 / 24)
+//      val minLag    = OnePole(minRDec, 1 - 1.0 / 24)
+//      val mul       = (maxLag - minLag).max(0.05).reciprocal
+//      val add       = -minLag.elastic(3)
+//      val mulR      = RepeatWindow(mul, size = 1, num = frameSize)
+//      val addR      = RepeatWindow(add, size = 1, num = frameSize)
+//      val i3e       = i3.elastic(frameSize * 6 / cfg.blockSize + 1)
+////      val i3e       = BufferDisk(i3)
+//
+//      (addR \ 0).poll(Metro(frameSize), "add")
+//      (mulR \ 0).poll(Metro(frameSize), "mul")
+//
+//      val i4        = ((i3e + addR) * mulR + noise).max(0).min(1)
+      val noise = WhiteNoise(noiseAmp)
+      val i3g   = ARCWindow(i3, size = frameSize, lag = 1.0 - 1.0/24)
+      val i4    = (i3g + noise).max(0.0).min(1.0)
 
-      (addR \ 0).poll(Metro(frameSize), "add")
-      (mulR \ 0).poll(Metro(frameSize), "mul")
-
-      val i4        = ((i3e + addR) * mulR + noise).max(0).min(1)
-
-      (i4  \ 0).poll(Metro(frameSize/8), "i4")
+      (i4 \ 0).poll(Metro(frameSize), "frame-done")
 
       val sig       = i4
       val specOut   = ImageFile.Spec(width = width, height = height, numChannels = 3)
