@@ -87,6 +87,8 @@ object Main {
 
       setUndecorated(true)
 
+      override def update(g: Graphics): Unit = paint(g)
+
       override def paint(g: Graphics): Unit = {
         super.paint(g)
         paintOffScreen()
@@ -126,7 +128,7 @@ object Main {
     w.setSize(NominalWidth, NominalHeight)
     screen.setFullScreenWindow(w)
 
-    val t = new Timer(25, new ActionListener {
+    val t = new Timer(12, new ActionListener {
       def actionPerformed(e: ActionEvent): Unit =
         if (animate) {
           frameIdx = frameIdx + 1
