@@ -38,7 +38,8 @@ object Main {
     }
     p.parse(args, Config()).fold(sys.exit(1)) { config =>
       // new Convolve(config)
-      if (config.isControl) new Control(config)
+      if (config.isControl) new Control(config).start()
+      new Player(config).start()
     }
   }
 }
