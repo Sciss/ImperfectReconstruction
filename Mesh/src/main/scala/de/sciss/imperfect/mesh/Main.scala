@@ -14,7 +14,7 @@
 package de.sciss.imperfect.mesh
 
 import java.awt.event.{ActionEvent, ActionListener, KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
-import java.awt.{Color, EventQueue, Font, Frame, Graphics, GraphicsDevice, GraphicsEnvironment, Window}
+import java.awt.{Color, EventQueue, Font, Frame, GraphicsDevice, GraphicsEnvironment}
 import java.io.PrintStream
 import javax.swing.Timer
 
@@ -50,7 +50,6 @@ object Main {
         sys.exit()
       }
       EventQueue.invokeLater(new Runnable { def run(): Unit = Main.run(config) })
-      run(config)
     }
   }
 
@@ -82,41 +81,19 @@ object Main {
       opt2.getOrElse(screens.head)
     }
 
-    val w = new Frame(null, screen.getDefaultConfiguration) {
-      private[this] var haveWarned = false
+    var haveWarnedWinSize = false
 
-      setUndecorated(true)
-
-      override def update(g: Graphics): Unit = paint(g)
-
-      override def paint(g: Graphics): Unit = {
-        super.paint(g)
-        paintOffScreen()
-        val width  = getWidth
-        val height = getHeight
-        if (width == NominalWidth && height == NominalHeight) {
-          g.drawImage(OffScreenImg,            0,             0, NominalWidth, VisibleHeight,
-                                               0,             0, NominalWidth, VisibleHeight, null)
-          g.drawImage(OffScreenImg,            0, VisibleHeight, NominalWidth, NominalHeight,
-                                    NominalWidth,             0, VisibleWidth, VisibleHeight, null)
-        } else {
-          if (!haveWarned) {
-            warn(s"Full screen window has dimensions $width x $height instead of $NominalWidth x $NominalHeight")
-            haveWarned = true
-          }
-          g.drawImage(OffScreenImg,            0,        0, width,        height/2,
-                                               0,        0, NominalWidth, VisibleHeight, null)
-          g.drawImage(OffScreenImg,            0, height/2, width,        height,
-                                    NominalWidth,        0, VisibleWidth, VisibleHeight, null)
-        }
-      }
+    val screenConf = screen.getDefaultConfiguration
+    val w = new Frame(null, screenConf) {
+      setUndecorated  (true)
+      setIgnoreRepaint(true)
     }
     w.addKeyListener(new KeyAdapter {
       override def keyTyped  (e: KeyEvent): Unit = ()
       override def keyPressed(e: KeyEvent): Unit = {
         e.getKeyCode match {
           case KeyEvent.VK_ESCAPE => quit()
-          case KeyEvent.VK_R      => drawRect = !drawRect; w.repaint()
+          case KeyEvent.VK_R      => drawRect = !drawRect // ; w.repaint()
           case KeyEvent.VK_A      => animate  = !animate
           case _ =>
         }
@@ -125,14 +102,54 @@ object Main {
     w.addMouseListener(new MouseAdapter {
       override def mousePressed(e: MouseEvent): Unit = w.requestFocus()
     })
-    w.setSize(NominalWidth, NominalHeight)
+// WARNING: setSize breaks buffer-strategy based painting ?
+//    w.setSize(NominalWidth, NominalHeight)
+    w.setSize(screenConf.getBounds.getSize)
     screen.setFullScreenWindow(w)
+    w.requestFocus()
+
+    // Ok, so there is some weird bug in that sometime the
+    // buffer doesn't have the correct size. For now, it
+    // seems, waiting with the thread a bit helps.
+    Thread.sleep(50)
+    w.createBufferStrategy(2)
+    Thread.sleep(50)
+
+    val strategy = w.getBufferStrategy
+
+    def draw(): Unit = {
+      paintOffScreen()
+      val width  = w.getWidth
+      val height = w.getHeight
+      do {
+        do {
+          val g = strategy.getDrawGraphics
+          if (width == NominalWidth && height == NominalHeight) {
+            g.drawImage(OffScreenImg,            0,             0, NominalWidth, VisibleHeight,
+                                                 0,             0, NominalWidth, VisibleHeight, null)
+            g.drawImage(OffScreenImg,            0, VisibleHeight, NominalWidth, NominalHeight,
+                                      NominalWidth,             0, VisibleWidth, VisibleHeight, null)
+          } else {
+            if (!haveWarnedWinSize) {
+              warn(s"Full screen window has dimensions $width x $height instead of $NominalWidth x $NominalHeight")
+              haveWarnedWinSize = true
+            }
+            g.drawImage(OffScreenImg,            0,        0, width,        height/2,
+                                                 0,        0, NominalWidth, VisibleHeight, null)
+            g.drawImage(OffScreenImg,            0, height/2, width,        height,
+                                      NominalWidth,        0, VisibleWidth, VisibleHeight, null)
+            g.dispose()
+          }
+        } while (strategy.contentsRestored())
+        strategy.show()
+      } while (strategy.contentsLost())
+    }
 
     val t = new Timer(12, new ActionListener {
       def actionPerformed(e: ActionEvent): Unit =
         if (animate) {
           frameIdx = frameIdx + 1
-          w.repaint()
+          draw()
         }
     })
     t.setRepeats(true)
