@@ -70,7 +70,7 @@ final class Control(config: Config) {
           val status = Status(statusId)
           clientStatus(clientIdx) = status
           if (!clientsReady && clientStatus.forall(_ == Idle)) {
-            println("All clients are ready!")
+            log("All clients are ready!")
             clientsReady = true
             val cmdTest = osc.Message("/test")
             var j = 0

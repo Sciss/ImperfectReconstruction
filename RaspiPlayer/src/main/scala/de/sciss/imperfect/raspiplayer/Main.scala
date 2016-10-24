@@ -28,6 +28,11 @@ object Main {
 //        .action   { (v, c) => c.copy(startFrame = v) }
 //        .validate {  v     => if (v >= 0) success else failure("start-frame must be >= 0") }
 
+      opt[String] ('h', "host")
+        .text ("This host's IP address")
+        .required()
+        .action   { (v, c) => c.copy(thisHost = v) }
+
       opt[Unit] ('d', "dump-osc")
         .text ("Enable OSC dump")
         .action   { (v, c) => c.copy(dumpOSC = true) }
@@ -38,8 +43,13 @@ object Main {
     }
     p.parse(args, Config()).fold(sys.exit(1)) { config =>
       // new Convolve(config)
-      if (config.isControl) new Control(config).start()
+      if (config.isControl) {
+        log("Creating control")
+        new Control(config).start()
+      }
+      log("Creating player")
       new Player(config).start()
+      log("Ready.")
     }
   }
 }

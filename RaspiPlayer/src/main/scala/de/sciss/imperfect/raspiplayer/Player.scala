@@ -13,7 +13,7 @@
 
 package de.sciss.imperfect.raspiplayer
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import de.sciss.file._
 import de.sciss.osc
@@ -25,7 +25,9 @@ final class Player(config: Config) {
   private[this] var status: Status = Idle
 
   private[this] val client = {
-    val res = UDP.Client(new InetSocketAddress("192.168.0.11", 57110))
+    val c   = UDP.Config()
+    c.localSocketAddress = new InetSocketAddress(config.thisHost /* InetAddress.getLocalHost() */, config.clientPort)
+    val res = UDP.Client(new InetSocketAddress("192.168.0.11", 57110), c)
     res.action = received
     res
   }
@@ -49,15 +51,15 @@ final class Player(config: Config) {
       override def run(): Unit = {
         while (!client.isConnected)
         try {
-          println("Trying to connect to server...")
+          log("Trying to connect to server...")
           client.connect()
-          println("Success.")
+          log("Client connected.")
           sendStatus()
         } catch {
           case NonFatal(_) =>
             Thread.sleep(1000)
         }
       }
-    }
+    } .start()
   }
 }

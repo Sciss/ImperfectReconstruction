@@ -15,5 +15,5 @@ package de.sciss.imperfect.raspiplayer
 
 import de.sciss.file._
 
-final case class Config(isControl: Boolean = false, clientPort: Int = 57120,
+final case class Config(isControl: Boolean = false, thisHost: String = "127.0.0.1", clientPort: Int = 57120,
                         testVideo: File = userHome / "Videos" / "test.mp4", dumpOSC: Boolean = false)

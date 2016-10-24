@@ -21,7 +21,7 @@ import scala.annotation.elidable
 import scala.annotation.elidable._
 
 package object raspiplayer {
-  var showLog = false
+  var showLog = true
 
   private[this] val logHeader = new SimpleDateFormat("[d MMM yyyy, HH:mm''ss.SSS] 'imperfect' - ", Locale.US)
 
