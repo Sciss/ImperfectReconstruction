@@ -12,13 +12,13 @@ lazy val commonSettings = Seq(
   scalacOptions      ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture", "-Xlint"),
   resolvers           += "Typesafe Releases" at "https://repo.typesafe.com/typesafe/maven-releases/",
   libraryDependencies ++= Seq(
-    "de.sciss"               %% "fileutil"        % "1.1.1",
-    "de.sciss"               %% "numbers"         % "0.1.1",
+    "de.sciss"               %% "fileutil"        % "1.1.2",
+    "de.sciss"               %% "numbers"         % "0.1.3",
     "de.sciss"               %% "kollflitz"       % "0.2.0",
-    "com.github.scopt"       %% "scopt"           % "3.4.0",
-    "de.sciss"               %% "fscape"          % "2.3.0-SNAPSHOT",
+    "com.github.scopt"       %% "scopt"           % "3.5.0",
+    "de.sciss"               %% "fscape"          % "2.3.0",
     "org.apache.xmlgraphics" %  "batik-parser"    % "1.8",
-    "org.swinglabs.swingx"   % "swingx-graphics"  % "1.6.5-1"
+    "org.swinglabs.swingx"   % "swingx-graphics"  % "1.6.5"
   )
   // target in assembly := baseDirectory.value
 )
