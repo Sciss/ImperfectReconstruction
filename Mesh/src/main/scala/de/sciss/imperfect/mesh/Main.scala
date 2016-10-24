@@ -14,7 +14,8 @@
 package de.sciss.imperfect.mesh
 
 import java.awt.event.{ActionEvent, ActionListener, KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
-import java.awt.{Color, EventQueue, Font, Frame, GraphicsDevice, GraphicsEnvironment}
+import java.awt.image.BufferedImage
+import java.awt.{Color, EventQueue, Font, Frame, GraphicsDevice, GraphicsEnvironment, Point}
 import java.io.PrintStream
 import javax.swing.Timer
 
@@ -107,6 +108,11 @@ object Main {
     w.setSize(screenConf.getBounds.getSize)
     screen.setFullScreenWindow(w)
     w.requestFocus()
+
+    // "hide" cursor
+    val cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)
+    val cursor = w.getToolkit.createCustomCursor(cursorImg, new Point(0, 0), "blank")
+    w.setCursor(cursor)
 
     // Ok, so there is some weird bug in that sometime the
     // buffer doesn't have the correct size. For now, it
