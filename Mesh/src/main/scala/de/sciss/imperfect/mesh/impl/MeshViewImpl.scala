@@ -151,12 +151,14 @@ object MeshViewImpl {
 
       _southBox = ggSouthBox
 
-      component = new BorderPanel {
-        background = Color.black
-        add(panel.component, BorderPanel.Position.Center)
-        add(ggSouthBox     , BorderPanel.Position.South )
-        add(ggFaderBox     , BorderPanel.Position.East  )
-      }
+//      component = new BorderPanel {
+//        background = Color.black
+//        add(panel.component, BorderPanel.Position.Center)
+//        add(ggSouthBox     , BorderPanel.Position.South )
+//        add(ggFaderBox     , BorderPanel.Position.East  )
+//      }
+
+      component = panel.component
 
       // if (config.fullScreenKey) installFullScreenKey(frame)
     }
