@@ -25,12 +25,19 @@ import scala.Predef.{any2stringadd => _, _}
 import scala.swing.Swing
 
 object ConvolveFSc {
+  val baseDir       = userHome / "Documents" / "projects" / "Imperfect" / "scans" /"notebook2016"
+
   final case class Config(kernel: Int = 16, noiseAmp: Double = 0.05,
                           groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 0,
-                          lagTime: Double = 1.0 - 1.0/24)
+                          lagTime: Double = 1.0 - 1.0/24, fFltIn: File = baseDir / s"hp5-fft2d-16.aif")
 
   def main(args: Array[String]): Unit = {
     val p = new scopt.OptionParser[Config]("Imperfect-Notebook Convolve") {
+      opt[File] ('f', "filter")
+        .text ("Filter file")
+        .required()
+        .action   { (v, c) => c.copy(fFltIn = v) }
+
       opt[Int] ('g', "group")
         .text ("Group index")
         .required()
@@ -91,7 +98,6 @@ object ConvolveFSc {
 
   def run(config: Config): Unit = {
     import config._
-    val baseDir       = userHome / "Documents" / "projects" / "Imperfect" / "scans" /"notebook2016"
     val pagesDir      = baseDir / "universe-pages"
     val groupInDir    = pagesDir / s"group-$groupIdx"
     val numPages      = groupInDir.children(_.ext == "png").size
@@ -104,7 +110,7 @@ object ConvolveFSc {
     val numFrames     = (2 * numPages + 1) * fadeFrames
     // val tempOutRange  = 1 to numFrames
 
-    val fFltIn    = baseDir / s"hp5-fft2d-$kernel.aif"
+//    val fFltIn    = baseDir / s"hp5-fft2d-$kernel.aif"
 
 //    if (fOut.exists() && fOut.length() > 0) {
 //      println(s"File '${fOut.name}' already exists. Not overwriting")
