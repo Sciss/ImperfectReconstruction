@@ -13,9 +13,10 @@
 
 package de.sciss.imperfect.mesh
 
-import java.awt.event.{KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
-import java.awt.{Color, Font, Frame, Graphics, GraphicsDevice, GraphicsEnvironment, Window}
+import java.awt.event.{ActionEvent, ActionListener, KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
+import java.awt.{Color, EventQueue, Font, Frame, Graphics, GraphicsDevice, GraphicsEnvironment, Window}
 import java.io.PrintStream
+import javax.swing.Timer
 
 object Main {
   final case class Config(verbose: Boolean = false, screenId: String = "", listScreens: Boolean = false)
@@ -48,6 +49,7 @@ object Main {
         printScreens(Console.out)
         sys.exit()
       }
+      EventQueue.invokeLater(new Runnable { def run(): Unit = Main.run(config) })
       run(config)
     }
   }
@@ -80,8 +82,10 @@ object Main {
       opt2.getOrElse(screens.head)
     }
 
-    val w = new Window(null, screen.getDefaultConfiguration) {
+    val w = new Frame(null, screen.getDefaultConfiguration) {
       private[this] var haveWarned = false
+
+      setUndecorated(true)
 
       override def paint(g: Graphics): Unit = {
         super.paint(g)
@@ -107,32 +111,60 @@ object Main {
     }
     w.addKeyListener(new KeyAdapter {
       override def keyTyped  (e: KeyEvent): Unit = ()
-      override def keyPressed(e: KeyEvent): Unit = if (e.getKeyCode == KeyEvent.VK_ESCAPE) quit()
+      override def keyPressed(e: KeyEvent): Unit = {
+        e.getKeyCode match {
+          case KeyEvent.VK_ESCAPE => quit()
+          case KeyEvent.VK_R      => drawRect = !drawRect; w.repaint()
+          case KeyEvent.VK_A      => animate  = !animate
+          case _ =>
+        }
+      }
     })
     w.addMouseListener(new MouseAdapter {
       override def mousePressed(e: MouseEvent): Unit = w.requestFocus()
     })
     w.setSize(NominalWidth, NominalHeight)
     screen.setFullScreenWindow(w)
+
+    val t = new Timer(25, new ActionListener {
+      def actionPerformed(e: ActionEvent): Unit =
+        if (animate) {
+          frameIdx = frameIdx + 1
+          w.repaint()
+        }
+    })
+    t.setRepeats(true)
+    t.start()
   }
 
-  private[this] val fntTest = new Font(Font.SANS_SERIF, Font.BOLD, 500)
+  private[this] val fntTest  = new Font(Font.SANS_SERIF, Font.BOLD, 500)
+  private[this] var drawRect = false
+  private[this] var animate  = true
+  private[this] var frameIdx = 0
 
   def paintOffScreen(): Unit = {
     val g2 = OffScreenG
     g2.setColor(Color.black)
     g2.fillRect(0, 0, VisibleWidth, VisibleHeight)
+
+    val atOrig = g2.getTransform
+    val rot = frameIdx * Math.PI / 180
+    g2.rotate(rot, VisibleWidth/2, VisibleHeight/2)
     g2.setColor(Color.white)
     g2.setFont(fntTest)
     val fm = g2.getFontMetrics
     g2.drawString("Imperfect Reconstruction", 20, fm.getAscent + 20)
-    g2.fillRect(0, 0, VisibleWidth, 10)
-    g2.fillRect(0, VisibleHeight - 10, VisibleWidth, 10)
-    g2.fillRect(0, 10, 10, VisibleHeight - 20)
-    g2.fillRect(VisibleWidth - 10, 10, 10, VisibleHeight - 20ff)
+    g2.setTransform(atOrig)
 
-    g2.setColor(Color.gray)
-    g2.fillRect(VisibleWidth/2 - 10, 10, 20, VisibleHeight - 20)
+    if (drawRect) {
+      g2.fillRect(0, 0, VisibleWidth, 10)
+      g2.fillRect(0, VisibleHeight - 10, VisibleWidth, 10)
+      g2.fillRect(0, 10, 10, VisibleHeight - 20)
+      g2.fillRect(VisibleWidth - 10, 10, 10, VisibleHeight - 20)
+
+      g2.setColor(Color.gray)
+      g2.fillRect(VisibleWidth/2 - 10, 10, 20, VisibleHeight - 20)
+    }
   }
 
   def quit(): Unit = {
