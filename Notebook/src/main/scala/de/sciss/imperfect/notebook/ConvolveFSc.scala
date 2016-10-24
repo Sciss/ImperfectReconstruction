@@ -24,7 +24,7 @@ import scala.swing.Swing
 
 object ConvolveFSc {
   final case class Config(kernel: Int = 16, noiseAmp: Double = 0.05, width: Int = 1024, height: Int = 1024,
-                          groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 80,
+                          groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 0,
                           lagTime: Double = 1.0 - 1.0/24)
 
   def main(args: Array[String]): Unit = run(Config())
@@ -168,9 +168,11 @@ object ConvolveFSc {
 
       val env1p     = env1.pow(8)
       val env2p     = env2.pow(8)
-      val noiseAmp1l= (-env1p + (0.9: GE)).max(0) // 1 - env1p  // env1p.linlin(1, 0, 0, 1 /* 24 */)
+//      val noiseAmp1l= (-env1p + (0.9: GE)).max(0) // 1 - env1p  // env1p.linlin(1, 0, 0, 1 /* 24 */)
+      val noiseAmp1l= env1p.linlin(0, 1, 1.0, -0.15).max(0) // 1 - env1p  // env1p.linlin(1, 0, 0, 1 /* 24 */)
       val noiseDC1l = noiseAmp1l * 2 // env1p.linlin(1, 0, 0, 1 /* 24 */ /* 104 */)
-      val noiseAmp2l= (-env2p + (0.9: GE)).max(0) // 1 - env2p  // env2p.linlin(1, 0, 0, 1 /* 24 */)
+//      val noiseAmp2l= (-env2p + (0.9: GE)).max(0) // 1 - env2p  // env2p.linlin(1, 0, 0, 1 /* 24 */)
+      val noiseAmp2l= env2p.linlin(0, 1, 1.0, -0.15).max(0) // 1 - env1p  // env1p.linlin(1, 0, 0, 1 /* 24 */)
       val noiseDC2l = noiseAmp2l * 2 // env2p.linlin(1, 0, 0, 1 /* 24 */ /* 104 */)
       val noiseAmp1 = RepeatWindow(noiseAmp1l, size = 1, num = frameSize)
       val noiseAmp2 = RepeatWindow(noiseAmp2l, size = 1, num = frameSize)
