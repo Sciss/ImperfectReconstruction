@@ -35,7 +35,7 @@ object Convolve extends App {
                     width: Int = 0, height: Int = 0,
                     fadeLen: Int = 24)
 
-  val p = new scopt.OptionParser[Config]("Anemone Convolve") {
+  val p = new scopt.OptionParser[Config]("Imperfect-Notebook Convolve") {
     arg[File]("input-a")
       .text ("First input image template (where %d will be replaced by frame index)")
       .required()

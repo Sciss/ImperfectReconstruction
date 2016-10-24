@@ -13,6 +13,8 @@
 
 package de.sciss.imperfect.notebook
 
+import javax.imageio.ImageIO
+
 import de.sciss.file._
 import de.sciss.fscape.gui.SimpleGUI
 import de.sciss.fscape.stream.Control
@@ -23,11 +25,45 @@ import scala.Predef.{any2stringadd => _, _}
 import scala.swing.Swing
 
 object ConvolveFSc {
-  final case class Config(kernel: Int = 16, noiseAmp: Double = 0.05, width: Int = 1024, height: Int = 1024,
+  final case class Config(kernel: Int = 16, noiseAmp: Double = 0.05,
                           groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 0,
                           lagTime: Double = 1.0 - 1.0/24)
 
-  def main(args: Array[String]): Unit = run(Config())
+  def main(args: Array[String]): Unit = {
+    val p = new scopt.OptionParser[Config]("Imperfect-Notebook Convolve") {
+      opt[Int] ('g', "group")
+        .text ("Group index")
+        .required()
+        .action   { (v, c) => c.copy(groupIdx = v) }
+        .validate {  v     => if (v >= 1 && v <= 8) success else failure("group index must be 1 to 8") }
+
+      opt[Int] ('k', "kernel")
+        .text ("Convolution kernel size. Must be a power of two. Default: 32")
+        .action   { (v, c) => c.copy(kernel = v) }
+        .validate {  v     =>
+          import numbers.Implicits._
+          if (v >= 2 && v.isPowerOfTwo) success else failure("kernel must be >= 2 and power of two") }
+
+      opt[Int] ('f', "fade-frames")
+        .text ("Fade length in frames (default: 48).")
+        .action   { (v, c) => c.copy(fadeFrames = v) }
+
+      opt[Int] ('s', "skip-frames")
+        .text ("Number of input frames to skip (default: 0).")
+        .action   { (v, c) => c.copy(skipFrames = v) }
+
+      opt[Double] ('n', "noise")
+        .text ("Noise amplitude. Default: 1.0)")
+        .action   { (v, c) => c.copy(noiseAmp = v) }
+
+      opt[Double] ('l', "lag-time")
+        .text ("ARC lag  time (default: 0.958)")
+        .action   { (v, c) => c.copy(lagTime = v) }
+    }
+    p.parse(args, Config()).fold(sys.exit(1)) { config =>
+      run(config)
+    }
+  }
 
   case class Levels(r: (Int, Int), g: (Int, Int), b: (Int, Int), value: (Int, Int))
 
@@ -47,6 +83,11 @@ object ConvolveFSc {
   }
 
   def invert(in: GE): GE = (-in + (1: GE)).elastic(2)
+
+  def format(f: File, i: Int): File = {
+    val n = f.name.format(i)
+    f.parentOption.fold(file(n))(_ / n)
+  }
 
   def run(config: Config): Unit = {
     import config._
@@ -69,6 +110,11 @@ object ConvolveFSc {
 //      println(s"File '${fOut.name}' already exists. Not overwriting")
 //      sys.exit(1)
 //    }
+
+    val imgTest   = ImageIO.read(format(tempIn, 1))
+    val width     = imgTest.getWidth
+    val height    = imgTest.getHeight
+    imgTest.flush()
 
     var gui: SimpleGUI = null
     val cfg = Control.Config()
