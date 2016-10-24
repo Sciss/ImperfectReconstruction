@@ -12,5 +12,5 @@ object MeshFrame {
 }
 trait MeshFrame[S <: Sys[S]] extends Disposable[S#Tx] {
   def view: MeshView[S]
-  def frame: Frame
+  // def frame: Frame
 }
