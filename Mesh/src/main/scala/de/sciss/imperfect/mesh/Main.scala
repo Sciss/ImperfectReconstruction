@@ -13,7 +13,7 @@
 
 package de.sciss.imperfect.mesh
 
-import java.awt.event.{KeyAdapter, KeyEvent}
+import java.awt.event.{KeyAdapter, KeyEvent, MouseAdapter, MouseEvent}
 import java.awt.{Color, Font, Frame, Graphics, GraphicsDevice, GraphicsEnvironment, Window}
 import java.io.PrintStream
 
@@ -34,7 +34,6 @@ object Main {
 
       opt[String] ('s', "screen")
         .text ("Screen identifier")
-        .required()
         .action   { (v, c) => c.copy(screenId = v) }
 
       opt[Unit] ('l', "list-screens")
@@ -82,26 +81,42 @@ object Main {
     }
 
     val w = new Window(null, screen.getDefaultConfiguration) {
+      private[this] var haveWarned = false
+
       override def paint(g: Graphics): Unit = {
         super.paint(g)
-        paintWindow(g)
+        paintOffScreen()
+        val width  = getWidth
+        val height = getHeight
+        if (width == NominalWidth && height == NominalHeight) {
+          g.drawImage(OffScreenImg,            0,             0, NominalWidth, VisibleHeight,
+                                               0,             0, NominalWidth, VisibleHeight, null)
+          g.drawImage(OffScreenImg,            0, VisibleHeight, NominalWidth, NominalHeight,
+                                    NominalWidth,             0, VisibleWidth, VisibleHeight, null)
+        } else {
+          if (!haveWarned) {
+            warn(s"Full screen window has dimensions $width x $height instead of $NominalWidth x $NominalHeight")
+            haveWarned = true
+          }
+          g.drawImage(OffScreenImg,            0,        0, width,        height/2,
+                                               0,        0, NominalWidth, VisibleHeight, null)
+          g.drawImage(OffScreenImg,            0, height/2, width,        height,
+                                    NominalWidth,        0, VisibleWidth, VisibleHeight, null)
+        }
       }
     }
     w.addKeyListener(new KeyAdapter {
       override def keyTyped  (e: KeyEvent): Unit = ()
       override def keyPressed(e: KeyEvent): Unit = if (e.getKeyCode == KeyEvent.VK_ESCAPE) quit()
     })
+    w.addMouseListener(new MouseAdapter {
+      override def mousePressed(e: MouseEvent): Unit = w.requestFocus()
+    })
     w.setSize(NominalWidth, NominalHeight)
     screen.setFullScreenWindow(w)
   }
 
   private[this] val fntTest = new Font(Font.SANS_SERIF, Font.BOLD, 500)
-
-  def paintWindow(g: Graphics): Unit = {
-    paintOffScreen()
-    g.drawImage(OffScreenImg, 0, 0, NominalWidth, VisibleHeight, 0, 0, NominalWidth, VisibleHeight, null)
-    g.drawImage(OffScreenImg, 0, VisibleHeight, NominalWidth, NominalHeight, NominalWidth, 0, VisibleWidth, VisibleHeight, null)
-  }
 
   def paintOffScreen(): Unit = {
     val g2 = OffScreenG
@@ -111,6 +126,13 @@ object Main {
     g2.setFont(fntTest)
     val fm = g2.getFontMetrics
     g2.drawString("Imperfect Reconstruction", 20, fm.getAscent + 20)
+    g2.fillRect(0, 0, VisibleWidth, 10)
+    g2.fillRect(0, VisibleHeight - 10, VisibleWidth, 10)
+    g2.fillRect(0, 10, 10, VisibleHeight - 20)
+    g2.fillRect(VisibleWidth - 10, 10, 10, VisibleHeight - 20ff)
+
+    g2.setColor(Color.gray)
+    g2.fillRect(VisibleWidth/2 - 10, 10, 20, VisibleHeight - 20)
   }
 
   def quit(): Unit = {
