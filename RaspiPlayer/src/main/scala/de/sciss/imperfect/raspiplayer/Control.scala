@@ -13,10 +13,10 @@
 
 package de.sciss.imperfect.raspiplayer
 
-import java.net.{InetAddress, InetSocketAddress, SocketAddress}
+import java.net.{InetSocketAddress, SocketAddress}
 
 import de.sciss.osc
-import de.sciss.osc.{Packet, TCP, UDP}
+import de.sciss.osc.{Packet, UDP}
 
 import scala.util.Random
 
@@ -49,8 +49,8 @@ final class Control(config: Config) {
   }
 
   def start(): Unit = {
-    transmitter.connect()
     receiver   .connect()
+    transmitter.connect()
   }
 
   private[this] var clientsReady = false

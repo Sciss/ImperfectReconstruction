@@ -17,13 +17,25 @@ import java.net.InetSocketAddress
 
 import de.sciss.file._
 import de.sciss.osc
-import de.sciss.osc.{Packet, TCP, UDP}
+import de.sciss.osc.{Packet, UDP}
 
 import scala.util.control.NonFatal
 
 final class Player(config: Config) {
-  private[this] val received: (Packet => Unit) = {
+  private[this] var status: Status = Idle
+
+  private[this] val client = {
+    val res = UDP.Client(new InetSocketAddress("192.168.0.11", 57110))
+    res.action = received
+    res
+  }
+
+  private[this] def sendStatus(): Unit = client ! osc.Message("/status", status.id)
+
+  private[this] def received(p: Packet): Unit = p match {
     case osc.Message("/status") =>
+      sendStatus()
+
     case osc.Message("/test") =>
       import sys.process._
       Seq("omxplayer", "--loop", config.testVideo.path).run()
@@ -32,14 +44,6 @@ final class Player(config: Config) {
       Console.err.println(s"Unknown OSC message $p from control")
   }
 
-  private[this] val client = {
-    val res = UDP.Client(new InetSocketAddress("192.168.0.11", 57110))
-    res.action = received
-    res
-  }
-
-  private[this] var status: Status = Idle
-
   def start(): Unit = {
     new Thread {
       override def run(): Unit = {
@@ -47,6 +51,8 @@ final class Player(config: Config) {
         try {
           println("Trying to connect to server...")
           client.connect()
+          println("Success.")
+          sendStatus()
         } catch {
           case NonFatal(_) =>
             Thread.sleep(1000)

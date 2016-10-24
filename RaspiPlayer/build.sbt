@@ -9,7 +9,7 @@ lazy val commonSettings = Seq(
   homepage            := Some(url(s"https://github.com/Sciss/$baseName")),
   scalaVersion        := "2.11.8",
   licenses            := Seq(gpl2),
-  scalacOptions      ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture", "-Xlint"),
+  scalacOptions      ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture", "-Xlint:-stars-align,_"),
   resolvers           += "Typesafe Releases" at "https://repo.typesafe.com/typesafe/maven-releases/",
   libraryDependencies ++= Seq(
     "de.sciss"               %% "fileutil"     % "1.1.1",
