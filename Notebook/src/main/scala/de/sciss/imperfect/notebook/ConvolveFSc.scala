@@ -17,17 +17,21 @@ import de.sciss.file._
 import de.sciss.fscape.gui.SimpleGUI
 import de.sciss.fscape.stream.Control
 import de.sciss.fscape.{GE, Graph, graph}
+import de.sciss.numbers
 
 import scala.Predef.{any2stringadd => _, _}
 import scala.swing.Swing
 
 object ConvolveFSc {
   final case class Config(kernel: Int = 16, noiseAmp: Double = 0.05, width: Int = 1024, height: Int = 1024,
-                          groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 24 * 4 - 10)
+                          groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 80,
+                          lagTime: Double = 1.0 - 1.0/24)
 
   def main(args: Array[String]): Unit = run(Config())
 
   case class Levels(r: (Int, Int), g: (Int, Int), b: (Int, Int), value: (Int, Int))
+
+  private[this] final val DEBUG = false
 
   def applyLevels(in: GE, levels: Levels): GE = {
     import levels._
@@ -135,10 +139,15 @@ object ConvolveFSc {
       val m1        = MatrixInMatrix(inSeqRep1, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
       val m2        = MatrixInMatrix(inSeqRep2, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
 
-      val scale1l   = env1Mat.linexp(1, 0, 1, 0.5/kernel /* 0.01 */)
-      val scale2l   = env2Mat.linexp(1, 0, 1, 0.5/kernel /* 0.01 */)
-      val ampMat1l  = env1Mat.pow(1.0/8)
-      val ampMat2l  = env2Mat.pow(1.0/8)
+//      val scale1l   = env1Mat.linexp(1, 0, 1, 0.5/kernel /* 0.01 */)
+//      val scale2l   = env2Mat.linexp(1, 0, 1, 0.5/kernel /* 0.01 */)
+      import numbers.Implicits._
+      val scale1l   = (env1Mat * 8 - 4).atan.linlin(-4.0.atan: GE, 4.0.atan: GE, 0.5/kernel: GE, 1: GE)
+      val scale2l   = (env2Mat * 8 - 4).atan.linlin(-4.0.atan: GE, 4.0.atan: GE, 0.5/kernel: GE, 1: GE)
+//      val scale1l   = env1Mat.pow(2)
+//      val scale2l   = env2Mat.pow(2)
+      val ampMat1l  = env1Mat // .pow(1.0/8)
+      val ampMat2l  = env2Mat // .pow(1.0/8)
       val ampMat1   = RepeatWindow(ampMat1l, size = 1, num = frameSize * kernelS)
       val ampMat2   = RepeatWindow(ampMat2l, size = 1, num = frameSize * kernelS)
       val scale1    = RepeatWindow(scale1l , size = 1, num = frameSize * kernelS)
@@ -159,22 +168,36 @@ object ConvolveFSc {
 
       val env1p     = env1.pow(8)
       val env2p     = env2.pow(8)
-      val noiseAmp1l= 1 - env1p  // env1p.linlin(1, 0, 0, 1 /* 24 */)
-//      val noiseDC1l = noiseAmp1l // env1p.linlin(1, 0, 0, 1 /* 24 */ /* 104 */)
-      val noiseAmp2l= 1 - env2p  // env2p.linlin(1, 0, 0, 1 /* 24 */)
- //     val noiseDC2l = noiseAmp2l // env2p.linlin(1, 0, 0, 1 /* 24 */ /* 104 */)
+      val noiseAmp1l= (-env1p + (0.9: GE)).max(0) // 1 - env1p  // env1p.linlin(1, 0, 0, 1 /* 24 */)
+      val noiseDC1l = noiseAmp1l * 2 // env1p.linlin(1, 0, 0, 1 /* 24 */ /* 104 */)
+      val noiseAmp2l= (-env2p + (0.9: GE)).max(0) // 1 - env2p  // env2p.linlin(1, 0, 0, 1 /* 24 */)
+      val noiseDC2l = noiseAmp2l * 2 // env2p.linlin(1, 0, 0, 1 /* 24 */ /* 104 */)
       val noiseAmp1 = RepeatWindow(noiseAmp1l, size = 1, num = frameSize)
       val noiseAmp2 = RepeatWindow(noiseAmp2l, size = 1, num = frameSize)
-      val noiseDC1  = noiseAmp1 // RepeatWindow(noiseDC1l , size = 1, num = frameSize)
-      val noiseDC2  = noiseAmp2 // RepeatWindow(noiseDC2l , size = 1, num = frameSize)
+      val noiseDC1  = RepeatWindow(noiseDC1l , size = 1, num = frameSize)
+      val noiseDC2  = RepeatWindow(noiseDC2l , size = 1, num = frameSize)
+
+      if (DEBUG) {
+        noiseAmp1.poll(Metro(frameSize), "noiseAmp1")
+        noiseAmp2.poll(Metro(frameSize), "noiseAmp2")
+        noiseDC1 .poll(Metro(frameSize), "noiseDC1")
+        noiseDC2 .poll(Metro(frameSize), "noiseDC2")
+      }
 
       val noise1    = WhiteNoise(Seq[GE](noiseAmp1, noiseAmp1, noiseAmp1)) + noiseDC1
-//      val m1n       = ResizeWindow(noise1, size = 1, start = 0, stop = kernelS - 1)
-      val m1n       = ResizeWindow(noise1, size = 1, start = -kernelS/2, stop = kernelS/2)
-      val m1x       = m1ab + m1n // (m1n * 24 + (104: GE))
-
       val noise2    = WhiteNoise(Seq[GE](noiseAmp2, noiseAmp2, noiseAmp2)) + noiseDC2
-      val m2n       = ResizeWindow(noise2, size = 1, start = 0, stop = kernelS - 1)
+
+      // val m1n       = ResizeWindow(noise1, size = 1, start = 0, stop = kernelS - 1)
+      val m1n       = ResizeWindow(noise1, size = 1, start = -kernelS/2, stop = kernelS/2 - 1)
+      // val m2n       = ResizeWindow(noise2, size = 1, start = 0, stop = kernelS - 1)
+      val m2n       = ResizeWindow(noise2, size = 1, start = -kernelS/2, stop = kernelS/2 - 1)
+
+      if (DEBUG) {
+        m1n.poll(Metro(frameSize * kernelS), "m1n")
+        m2n.poll(Metro(frameSize * kernelS), "m2n")
+      }
+
+      val m1x       = m1ab + m1n // (m1n * 24 + (104: GE))
       val m2x       = m2ab + m2n // (m1n * 24 + (104: GE))
 
       val m1f       = Real2FFT(m1x, rows = kernel, columns = kernel)
@@ -186,7 +209,7 @@ object ConvolveFSc {
       val i3        = flt
 
       val noise     = WhiteNoise(noiseAmp)
-      val i3g       = ARCWindow(i3, size = frameSize, lag = 1.0 - 1.0/(24/2))
+      val i3g       = ARCWindow(i3, size = frameSize, lag = lagTime)
       val i4        = (i3g + noise).max(0.0).min(1.0)
 
       (i4 \ 0).poll(Metro(frameSize), "frame-done")
