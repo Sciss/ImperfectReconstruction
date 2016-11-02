@@ -13,7 +13,6 @@
 
 package de.sciss.imperfect.trajectory
 
-import de.sciss.kollflitz.Vec
 import de.sciss.serial.{DataInput, DataOutput}
 
 import scala.collection.breakOut
@@ -75,10 +74,11 @@ object Events {
   private[this] val RegPoly         = """polyline (.+) Enter""".r
   private[this] val RegPolyPt       = s"""($rFloat),($rFloat),($rFloat)""".r
 
-  def parse(source: io.Source): Vec[Event] = {
-    val b   = Vector.newBuilder[Event]
+  def parse(source: io.Source): Array[Event] = {
+    val b   = Array.newBuilder[Event]
     val ln  = source.getLines()
-    while (ln.hasNext) {
+    // var SZ = 0
+    while (ln.hasNext /* && SZ < 1 */) {
       val RegEvent(idS, spillS)   = ln.next()
       val id    = idS   .toInt
       val spill = spillS.toInt
@@ -86,7 +86,7 @@ object Events {
       val numParticles = numParticlesS.toInt
       val lnDash = ln.next().trim
       require(lnDash == "===========", s"'$lnDash'")
-      val particles = for (i <- 0 until numParticles) yield {
+      val particles: Array[Particle] = (0 until numParticles).map { i =>
         val RegPartNum(partIdS) = ln.next()
         val partId = partIdS.toInt
         require(partId == i)
@@ -111,7 +111,7 @@ object Events {
         val timeError = timeErrorS.toFloat
         val RegNumVertices(numVerticesS) = ln.next()
         val numVertices = numVerticesS.toInt
-        val vertices = for (j <- 0 until numVertices) yield {
+        val vertices: Array[Vertex] = (0 until numVertices).map { j =>
           val RegVertexPos(vxS , vyS , vzS ) = ln.next()
           val vx = vxS.toFloat; val vy = vyS.toFloat; val vz = vzS.toFloat
           val v = Point3D(vx, vy, vz)
@@ -122,44 +122,62 @@ object Events {
           val vxt = vxtS.toFloat; val vyt = vytS.toFloat; val vzt = vztS.toFloat
           val vt = Point3D(vxt, vyt, vzt)
           Vertex(v, ve, vt)
-        }
+        } (breakOut)
+
         val RegTrajRecon(trajErrorS) = ln.next()
         val trajError = trajErrorS.toFloat
         val RegMaterial(materialS) = ln.next()
         val material = materialS.toFloat
         require(ln.next() == """trajectory:""")
         val RegPoly(polyS) = ln.next()
-        val traj: Vec[Point3D] = polyS.split("""\s""").map { s =>
+        val traj: Array[Point3D] = polyS.split("""\s""").map { s =>
           val RegPolyPt(pxS, pyS, pzS) = s
           val px = pxS.toFloat; val py = pyS.toFloat; val pz = pzS.toFloat
           Point3D(px, py, pz)
         } (breakOut)
+
         val lnDash = ln.next().trim
         require(lnDash == "===========", s"'$lnDash'")
         Particle(zFirst = zFirst, zLast = zLast, isBeam = isBeam, isScattered = isScattered, charge = charge,
           momentum = momentum, numHits = numHits, timeMean = timeMean, timeError = timeError,
           vertices = vertices, trajError = trajError, material = material, traj = traj)
-      }
+      } (breakOut)
+
       val lnBlank = ln.next()
       require(lnBlank == "", s"'$lnBlank'")
-      val evt = Event(id = id, spill = spill, particles = particles)
+      val evt = Event(id)(spill = spill, particles = particles)
       b += evt
+      // SZ += 1
     }
     b.result()
   }
 
-  def read(in: DataInput): Vec[Event] = {
+  def read(in: DataInput): Array[Event] = {
     val numEvents = in.readInt()
 //    Vector.fill(numEvents)(Event.read(in))
-    Vector.tabulate(numEvents) { i =>
-      if (i % 800 == 0) print('.')
-      Event.read(in)
+    val res = new Array[Event](numEvents)
+    var i = 0
+    while (i < numEvents) {
+//      if (i % 800 == 0) print('.')
+      if (i % 100 == 0) {
+        println(i)
+      }
+      res(i) = Event.read(in)
+      i += 1
     }
+    res
   }
 
-  def write(xs: Vec[Event], out: DataOutput): Unit = {
-    out.writeInt(xs.size)
-    xs.foreach(Event.write(_, out))
+  def write(xs: Array[Event], out: DataOutput): Unit = {
+    val numEvents = xs.length
+    out.writeInt(numEvents)
+    var i = 0
+    while (i < numEvents) {
+      val e = xs(i)
+      if (i % 100 == 0) println(i)
+      Event.write(e, out)
+      i += 1
+    }
   }
 }
 
@@ -167,25 +185,33 @@ object Event {
   private[this] val COOKIE = 0x4576
 
   def read(in: DataInput): Event = {
-    val cookie        = in.readShort()
+    val cookie        = in.readUnsignedShort()
     if (cookie != COOKIE) sys.error(s"Expected cookie ${COOKIE.toHexString} but found ${cookie.toHexString}")
     val id            = in.readInt()
-    val spill         = in.readShort()
-    val numParticles  = in.readShort()
-    val particles     = Vector.fill(numParticles)(Particle.read(in))
-    Event(id = id, spill = spill, particles = particles)
+    val spill         = in.readUnsignedShort()
+    val numParticles  = in.readUnsignedShort()
+    val particles     = new Array[Particle](numParticles)
+    var i = 0
+    while (i < numParticles) {
+      particles(i) = Particle.read(in)
+      i += 1
+    }
+    Event(id)(spill = spill, particles = particles)
   }
   
   def write(e: Event, out: DataOutput): Unit = {
     import e._
     out.writeShort(COOKIE)
     out.writeInt(id)
+    require(spill < 0xFFFF, s"Event ${e.id} spill field ($spill) overflow")
     out.writeShort(spill)
-    out.writeShort(particles.size)
+    val numParticles = particles.length
+    require(numParticles < 0xFFFF, s"Event ${e.id} number of particles ($numParticles) overflow")
+    out.writeShort(particles.length)
     particles.foreach(Particle.write(_, out))
   }
 }
-final case class Event(id: Int, spill: Int, particles: Vec[Particle])
+final case class Event(id: Int)(val spill: Int, val particles: Array[Particle])
 
 object Particle {
   def read(in: DataInput): Particle = {
@@ -195,15 +221,25 @@ object Particle {
     val isScattered = in.readBoolean()
     val charge      = in.readByte()
     val momentum    = in.readFloat()
-    val numHits     = in.readShort()
+    val numHits     = in.readUnsignedShort()
     val timeMean    = in.readFloat()
     val timeError   = in.readFloat()
-    val numVertices = in.readShort()
-    val vertices    = Vector.fill(numVertices)(Vertex.read(in))
+    val numVertices = in.readUnsignedShort()
+    val vertices    = new Array[Vertex](numVertices)
+    var i = 0
+    while (i < numVertices) {
+      vertices(i) = Vertex.read(in)
+      i += 1
+    }
     val trajError   = in.readFloat()
     val material    = in.readFloat()
-    val polySz      = in.readShort()
-    val traj        = Vector.fill(polySz)(Point3D.read(in))
+    val polySz      = in.readUnsignedShort()
+    val traj        = new Array[Point3D](polySz)
+    i = 0
+    while (i < polySz) {
+      traj(i) = Point3D.read(in)
+      i += 1
+    }
     Particle(zFirst = zFirst, zLast = zLast, isBeam = isBeam, isScattered = isScattered, charge = charge,
       momentum = momentum, numHits = numHits, timeMean = timeMean, timeError = timeError,
       vertices = vertices, trajError = trajError, material = material, traj = traj)
@@ -220,17 +256,29 @@ object Particle {
     out.writeShort  (numHits     )
     out.writeFloat  (timeMean    )
     out.writeFloat  (timeError   )
-    out.writeShort  (vertices.size)
-    vertices.foreach(Vertex.write(_, out))
+    val numVertices = vertices.length
+    require(numVertices < 0xFFFF, s"Particle number of vertices ($numVertices) overflow")
+    out.writeShort  (numVertices)
+    var i = 0
+    while (i < numVertices) {
+      Vertex.write(vertices(i), out)
+      i += 1
+    }
     out.writeFloat  (trajError   )
     out.writeFloat  (material    )
-    out.writeShort  (traj.size)
-    traj.foreach(Point3D.write(_, out))
+    val polySz = traj.length
+    require(polySz < 0xFFFF, s"Particle polyline size ($numVertices) overflow")
+    out.writeShort  (polySz)
+    i = 0
+    while (i < polySz) {
+      Point3D.write(traj(i), out)
+      i += 1
+    }
   }
 }
 final case class Particle(zFirst: Float, zLast: Float, isBeam: Boolean, isScattered: Boolean, charge: Int,
                           /* mass: Int, */ momentum: Float, numHits: Int, timeMean: Float, timeError: Float,
-                          vertices: Vec[Vertex], trajError: Float, material: Float, traj: Vec[Point3D])
+                          vertices: Array[Vertex], trajError: Float, material: Float, traj: Array[Point3D])
 
 object Vertex {
   def read(in: DataInput): Vertex = {

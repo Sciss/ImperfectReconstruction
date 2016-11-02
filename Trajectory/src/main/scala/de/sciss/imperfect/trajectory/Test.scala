@@ -26,7 +26,7 @@ object Test {
     val t1      = System.currentTimeMillis()
     val events  = if (fOut.isFile) {
 //       XXX TODO --- this is too slow - needs to be buffered
-       val dIn = DataInput.open(fIn)
+       val dIn = DataInput.open(fOut)
 //      val fis = new FileInputStream(fIn)
       try {
 //        val arr = new Array[Byte](fis.available())
@@ -48,6 +48,6 @@ object Test {
       res
     }
     val t2 = System.currentTimeMillis()
-    println(s"Got ${events.size} events (took ${t2-t1}ms).")
+    println(s"Got ${events.length} events (took ${t2-t1}ms).")
   }
 }
