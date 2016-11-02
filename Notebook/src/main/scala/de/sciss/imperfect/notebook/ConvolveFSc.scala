@@ -29,7 +29,9 @@ object ConvolveFSc {
 
   final case class Config(kernel: Int = 16, noiseAmp: Double = 0.05,
                           groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 0,
-                          lagTime: Double = 1.0 - 1.0/24, fFltIn: File = baseDir / s"hp5-fft2d-16.aif")
+                          zeroCrossings: Int = 0,
+                          lagTime: Double = 1.0 - 1.0/24, fFltIn: File = baseDir / s"hp5-fft2d-16.aif",
+                          continuousScale: Boolean = false)
 
   def main(args: Array[String]): Unit = {
     val p = new scopt.OptionParser[Config]("Imperfect-Notebook Convolve") {
@@ -64,8 +66,16 @@ object ConvolveFSc {
         .action   { (v, c) => c.copy(noiseAmp = v) }
 
       opt[Double] ('l', "lag-time")
-        .text ("ARC lag  time (default: 0.958)")
+        .text ("ARC lag time (default: 0.958)")
         .action   { (v, c) => c.copy(lagTime = v) }
+
+      opt[Int] ('z', "zero-crossings")
+        .text ("Sinc interpolation number of zero crossings (default: 0 - use bicubic algorithm)")
+        .action   { (v, c) => c.copy(zeroCrossings = v) }
+
+      opt[Unit] ("continuous")
+        .text ("Use continuous scaling operation")
+        .action   { (_, c) => c.copy(continuousScale = true) }
     }
     p.parse(args, Config()).fold(sys.exit(1)) { config =>
       run(config)
@@ -173,6 +183,14 @@ object ConvolveFSc {
         low
       }
 
+      def mkSawHigh(phase: Double): GE = {
+        val lfSaw   = LFSaw(1.0/(periodFrames * frameSize * kernelS), phase = phase)
+        val lfSawUp = (lfSaw + (1: GE)) * 2
+        val low0    = lfSawUp.min(1) - (lfSawUp - 3).max(0)
+        val low     = if (skipFrames == 0) low0 else low0.drop(skipFrames * frameSize * kernelS)
+        low
+      }
+
       def mkSaw(phase: Double): GE = {
         val low     = mkSawLow(phase)
         val rep1    = RepeatWindow(low , size = 1, num = frameSize)
@@ -185,8 +203,8 @@ object ConvolveFSc {
         rep2
       }
       
-      val env1Mat   = mkSawLow(0.75)
-      val env2Mat   = mkSawLow(0.25)
+      val env1Mat   = if (continuousScale) mkSawHigh(0.75) else mkSawLow(0.75)
+      val env2Mat   = if (continuousScale) mkSawHigh(0.25) else mkSawLow(0.25)
 
       val m1        = MatrixInMatrix(inSeqRep1, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
       val m2        = MatrixInMatrix(inSeqRep2, rowsOuter = height, columnsOuter = width, rowsInner = kernel, columnsInner = kernel)
@@ -200,14 +218,14 @@ object ConvolveFSc {
 //      val scale2l   = env2Mat.pow(2)
       val ampMat1l  = env1Mat // .pow(1.0/8)
       val ampMat2l  = env2Mat // .pow(1.0/8)
-      val ampMat1   = RepeatWindow(ampMat1l, size = 1, num = frameSize * kernelS)
-      val ampMat2   = RepeatWindow(ampMat2l, size = 1, num = frameSize * kernelS)
-      val scale1    = RepeatWindow(scale1l , size = 1, num = frameSize * kernelS)
-      val scale2    = RepeatWindow(scale2l , size = 1, num = frameSize * kernelS)
+      val ampMat1   = if (continuousScale) ampMat1l else RepeatWindow(ampMat1l, size = 1, num = frameSize * kernelS)
+      val ampMat2   = if (continuousScale) ampMat2l else RepeatWindow(ampMat2l, size = 1, num = frameSize * kernelS)
+      val scale1    = if (continuousScale) scale1l  else RepeatWindow(scale1l , size = 1, num = frameSize * kernelS)
+      val scale2    = if (continuousScale) scale2l  else RepeatWindow(scale2l , size = 1, num = frameSize * kernelS)
       val m1a       = AffineTransform2D.scale(in = m1, widthIn = kernel, heightIn = kernel,
-        sx = scale1, sy = scale1, zeroCrossings = 0, wrap = 0) * ampMat1
+        sx = scale1, sy = scale1, zeroCrossings = zeroCrossings, wrap = 0, rollOff = 0.95) * ampMat1
       val m2a       = AffineTransform2D.scale(in = m2, widthIn = kernel, heightIn = kernel,
-        sx = scale2, sy = scale2, zeroCrossings = 0, wrap = 0) * ampMat2
+        sx = scale2, sy = scale2, zeroCrossings = zeroCrossings, wrap = 0, rollOff = 0.95) * ampMat2
 //      val m1a = m1
 //      val m2a = m2
 
