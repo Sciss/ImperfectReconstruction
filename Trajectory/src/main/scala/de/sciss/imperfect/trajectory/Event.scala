@@ -1,6 +1,20 @@
+/*
+ *  Event.scala
+ *  (Imperfect Reconstruction)
+ *
+ *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *
+ *  This software is published under the GNU General Public License v2+
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.imperfect.trajectory
 
 import de.sciss.kollflitz.Vec
+import de.sciss.serial.{DataInput, DataOutput}
 
 import scala.collection.breakOut
 
@@ -32,26 +46,34 @@ Particle number <INT I IN 0 UNTIL N>
 ...
 
  */
-object Event {
-  private[this] val RegEvent        = """Event (\d+) in Spill (\d+)""".r
-  private[this] val RegNumPart      = """Number of Particles (\d+)""".r
-  private[this] val RegPartNum      = """Particle number (\d+)""".r
-  private[this] val RegZFirstLast   = """ZFirst (-?\d+[.]?\d+) ZLast (-?\d+[.]\d+)""".r
-  private[this] val RegIsBeam       = """Is beam ([01])""".r
-  private[this] val RegIsScattered  = """Is scattered beam ([01])""".r
-  private[this] val RegCharge       = """Charge (-?[1])""".r
-  private[this] val RegMass         = """Reconstructed mass ([-+]?\d+|[-+]?\d+[.]\d+)""".r
-  private[this] val RegMomentum     = """Momentum (-?\d+[.]?\d+)""".r
-  private[this] val RegNumHits      = """number of hits (\d+)""".r
-  private[this] val RegTimeMeanErr  = """mean time (-?\d+[.]?\d+) time error (\d+[.]?\d+)""".r
-  private[this] val RegNumVertices  = """associated with (\d+) vertices:""".r
-  private[this] val RegVertexPos    = """(-?\d+[.]?\d+),(-?\d+[.]?\d+),(-?\d+[.]?\d+) Enter""".r
-  private[this] val RegVertexErr    = """Error x, y, z for Vertex (\d+[.]?\d+) (\d+[.]?\d+) (\d+[.]?\d+)""".r
-  private[this] val RegVertexTraj   = """Error x, y, z for Traj at Vertex (\d+[.]?\d+) (\d+[.]?\d+) (\d+[.]?\d+)""".r
-  private[this] val RegTrajRecon    = """Trajectory reconstruction error (\d+[.]?\d+)""".r
-  private[this] val RegMaterial     = """Material traversed (\d+[.]?\d+)""".r
-  private[this] val RegPoly         = """polyline ((-?\d+[.]?\d+),(-?\d+[.]?\d+),(-?\d+[.]?\d+)\s)+Enter""".r
-  private[this] val RegPolyPt       = """(-?\d+[.]?\d+),(-?\d+[.]?\d+),(-?\d+[.]?\d+)\s""".r
+object Events {
+  private[this] val rInt            = """\d+"""
+  private[this] val rSignum         = """[-]?[1]"""
+  private[this] val rBinary         = """[01]"""
+  private[this] val rPosFloat       = """\d+(?:[.]\d+)?(?:[e][-]?\d+)?"""
+  private[this] val rFloat          = s"""[-+]?$rPosFloat"""
+  private[this] val rPosFloatOpt    = s"""[-][1]|$rPosFloat"""
+
+  private[this] val RegEvent        = s"""Event ($rInt) in Spill ($rInt)""".r
+  private[this] val RegNumPart      = s"""Number of Particles ($rInt)""".r
+  private[this] val RegPartNum      = s"""Particle number ($rInt)""".r
+  private[this] val RegZFirstLast   = s"""ZFirst ($rFloat) ZLast ($rFloat)""".r
+  private[this] val RegIsBeam       = s"""Is beam ($rBinary)""".r
+  private[this] val RegIsScattered  = s"""Is scattered beam ($rBinary)""".r
+  private[this] val RegCharge       = s"""Charge ($rSignum)""".r
+  private[this] val RegMass         = s"""Reconstructed mass ($rFloat)""".r
+  private[this] val RegMomentum     = s"""Momentum ($rFloat)""".r
+  private[this] val RegNumHits      = s"""number of hits ($rInt)""".r
+  private[this] val RegTimeMeanErr  = s"""mean time ($rFloat) time error ($rPosFloatOpt)""".r
+  private[this] val RegNumVertices  = s"""associated with ($rInt) vertices:""".r
+  private[this] val RegVertexPos    = s"""($rFloat),($rFloat),($rFloat) Enter""".r
+  private[this] val RegVertexErr    = s"""Error x, y, z for Vertex ($rFloat) ($rFloat) ($rFloat)""".r
+  private[this] val RegVertexTraj   = s"""Error x, y, z for Traj at Vertex ($rPosFloat) ($rPosFloat) ($rPosFloat)""".r
+  private[this] val RegTrajRecon    = s"""Trajectory reconstruction error ($rPosFloat)""".r
+  private[this] val RegMaterial     = s"""Material traversed ($rPosFloatOpt)""".r
+//  private[this] val RegPoly         = """polyline ((-?\d+[.]?\d+),(-?\d+[.]?\d+),(-?\d+[.]?\d+)\s)+Enter""".r
+  private[this] val RegPoly         = """polyline (.+) Enter""".r
+  private[this] val RegPolyPt       = s"""($rFloat),($rFloat),($rFloat)""".r
 
   def parse(source: io.Source): Vec[Event] = {
     val b   = Vector.newBuilder[Event]
@@ -62,9 +84,9 @@ object Event {
       val spill = spillS.toInt
       val RegNumPart(numParticlesS) = ln.next()
       val numParticles = numParticlesS.toInt
+      val lnDash = ln.next().trim
+      require(lnDash == "===========", s"'$lnDash'")
       val particles = for (i <- 0 until numParticles) yield {
-        val lnDash = ln.next().trim
-        require(lnDash == "===========", s"'$lnDash'")
         val RegPartNum(partIdS) = ln.next()
         val partId = partIdS.toInt
         require(partId == i)
@@ -106,29 +128,138 @@ object Event {
         val RegMaterial(materialS) = ln.next()
         val material = materialS.toFloat
         require(ln.next() == """trajectory:""")
-        val RegPoly(polyS @ _*) = ln.next()
-        val traj: Vec[Point3D] = polyS.map { s =>
+        val RegPoly(polyS) = ln.next()
+        val traj: Vec[Point3D] = polyS.split("""\s""").map { s =>
           val RegPolyPt(pxS, pyS, pzS) = s
           val px = pxS.toFloat; val py = pyS.toFloat; val pz = pzS.toFloat
           Point3D(px, py, pz)
         } (breakOut)
+        val lnDash = ln.next().trim
+        require(lnDash == "===========", s"'$lnDash'")
         Particle(zFirst = zFirst, zLast = zLast, isBeam = isBeam, isScattered = isScattered, charge = charge,
           momentum = momentum, numHits = numHits, timeMean = timeMean, timeError = timeError,
           vertices = vertices, trajError = trajError, material = material, traj = traj)
       }
-      require(ln.next() == "")
+      val lnBlank = ln.next()
+      require(lnBlank == "", s"'$lnBlank'")
       val evt = Event(id = id, spill = spill, particles = particles)
       b += evt
     }
     b.result()
   }
+
+  def read(in: DataInput): Vec[Event] = {
+    val numEvents = in.readInt()
+//    Vector.fill(numEvents)(Event.read(in))
+    Vector.tabulate(numEvents) { i =>
+      if (i % 800 == 0) print('.')
+      Event.read(in)
+    }
+  }
+
+  def write(xs: Vec[Event], out: DataOutput): Unit = {
+    out.writeInt(xs.size)
+    xs.foreach(Event.write(_, out))
+  }
+}
+
+object Event {
+  private[this] val COOKIE = 0x4576
+
+  def read(in: DataInput): Event = {
+    val cookie        = in.readShort()
+    if (cookie != COOKIE) sys.error(s"Expected cookie ${COOKIE.toHexString} but found ${cookie.toHexString}")
+    val id            = in.readInt()
+    val spill         = in.readShort()
+    val numParticles  = in.readShort()
+    val particles     = Vector.fill(numParticles)(Particle.read(in))
+    Event(id = id, spill = spill, particles = particles)
+  }
+  
+  def write(e: Event, out: DataOutput): Unit = {
+    import e._
+    out.writeShort(COOKIE)
+    out.writeInt(id)
+    out.writeShort(spill)
+    out.writeShort(particles.size)
+    particles.foreach(Particle.write(_, out))
+  }
 }
 final case class Event(id: Int, spill: Int, particles: Vec[Particle])
 
+object Particle {
+  def read(in: DataInput): Particle = {
+    val zFirst      = in.readFloat()
+    val zLast       = in.readFloat()
+    val isBeam      = in.readBoolean()
+    val isScattered = in.readBoolean()
+    val charge      = in.readByte()
+    val momentum    = in.readFloat()
+    val numHits     = in.readShort()
+    val timeMean    = in.readFloat()
+    val timeError   = in.readFloat()
+    val numVertices = in.readShort()
+    val vertices    = Vector.fill(numVertices)(Vertex.read(in))
+    val trajError   = in.readFloat()
+    val material    = in.readFloat()
+    val polySz      = in.readShort()
+    val traj        = Vector.fill(polySz)(Point3D.read(in))
+    Particle(zFirst = zFirst, zLast = zLast, isBeam = isBeam, isScattered = isScattered, charge = charge,
+      momentum = momentum, numHits = numHits, timeMean = timeMean, timeError = timeError,
+      vertices = vertices, trajError = trajError, material = material, traj = traj)
+  }
+  
+  def write(p: Particle, out: DataOutput): Unit = {
+    import p._
+    out.writeFloat  (zFirst      )
+    out.writeFloat  (zLast       )
+    out.writeBoolean(isBeam      )
+    out.writeBoolean(isScattered )
+    out.writeByte   (charge      )
+    out.writeFloat  (momentum    )
+    out.writeShort  (numHits     )
+    out.writeFloat  (timeMean    )
+    out.writeFloat  (timeError   )
+    out.writeShort  (vertices.size)
+    vertices.foreach(Vertex.write(_, out))
+    out.writeFloat  (trajError   )
+    out.writeFloat  (material    )
+    out.writeShort  (traj.size)
+    traj.foreach(Point3D.write(_, out))
+  }
+}
 final case class Particle(zFirst: Float, zLast: Float, isBeam: Boolean, isScattered: Boolean, charge: Int,
                           /* mass: Int, */ momentum: Float, numHits: Int, timeMean: Float, timeError: Float,
                           vertices: Vec[Vertex], trajError: Float, material: Float, traj: Vec[Point3D])
 
+object Vertex {
+  def read(in: DataInput): Vertex = {
+    val point     = Point3D.read(in)
+    val error     = Point3D.read(in)
+    val trajError = Point3D.read(in)
+    Vertex(point = point, error = error, trajError = trajError)
+  }
+
+  def write(v: Vertex, out: DataOutput): Unit = {
+    Point3D.write(v.point    , out)
+    Point3D.write(v.error    , out)
+    Point3D.write(v.trajError, out)
+  }
+}
 final case class Vertex(point: Point3D, error: Point3D, trajError: Point3D)
 
+object Point3D {
+  def read(in: DataInput): Point3D = {
+    val x = in.readFloat()
+    val y = in.readFloat()
+    val z = in.readFloat()
+    Point3D(x, y, z)
+  }
+  
+  def write(p: Point3D, out: DataOutput): Unit = {
+    out.writeFloat(p.x)
+    out.writeFloat(p.y)
+    out.writeFloat(p.z)
+  }
+}
 final case class Point3D(x: Float, y: Float, z: Float)

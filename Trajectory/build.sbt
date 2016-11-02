@@ -15,6 +15,7 @@ lazy val commonSettings = Seq(
     "de.sciss"               %% "fileutil"     % "1.1.2",
     "de.sciss"               %% "numbers"      % "0.1.3",
     "de.sciss"               %% "kollflitz"    % "0.2.0",
+    "de.sciss"               %% "serial"       % "1.0.2",
     "com.github.scopt"       %% "scopt"        % "3.5.0"
   )
   // target in assembly := baseDirectory.value
