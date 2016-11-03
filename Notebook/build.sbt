@@ -19,7 +19,8 @@ lazy val commonSettings = Seq(
     "de.sciss"               %% "fscape"          % "2.4.1-SNAPSHOT",
     "org.apache.xmlgraphics" %  "batik-parser"    % "1.8",
     "org.swinglabs.swingx"   % "swingx-graphics"  % "1.6.5"
-  )
+  ),
+  mainClass in (Compile, run) := Some("de.sciss.imperfect.notebook.ConvolveFSc")
   // target in assembly := baseDirectory.value
 )
 
