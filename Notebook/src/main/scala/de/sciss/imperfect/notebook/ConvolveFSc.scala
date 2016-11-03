@@ -31,7 +31,8 @@ object ConvolveFSc {
                           groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 0,
                           zeroCrossings: Int = 0,
                           lagTime: Double = 1.0 - 1.0/24, fFltIn: File = baseDir / s"hp5-fft2d-16.aif",
-                          continuousScale: Boolean = false, atan: Double = 4.0)
+                          continuousScale: Boolean = false, atan: Double = 4.0,
+                          outDir: File = baseDir / "universe-out")
 
   def main(args: Array[String]): Unit = {
     val p = new scopt.OptionParser[Config]("Imperfect-Notebook Convolve") {
@@ -80,6 +81,11 @@ object ConvolveFSc {
       opt[Double] ("atan")
         .text ("Atan scale factor (default: 4.0)")
         .action   { (v, c) => c.copy(atan = v) }
+
+      opt[File] ('d', "output")
+        .text ("Output directory")
+        .required()
+        .action   { (v, c) => c.copy(outDir = v) }
     }
     p.parse(args, Config()).fold(sys.exit(1)) { config =>
       run(config)
@@ -115,7 +121,6 @@ object ConvolveFSc {
     val pagesDir      = baseDir / "universe-pages"
     val groupInDir    = pagesDir / s"group-$groupIdx"
     val numPages      = groupInDir.children(_.ext == "png").size
-    val outDir        = baseDir / "universe-out"
     val groupOutDir   = outDir / s"group-$groupIdx"
     groupOutDir.mkdirs()
     val tempIn        = groupInDir  / "notebook-p%d.png"
