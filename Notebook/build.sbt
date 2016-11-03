@@ -16,7 +16,7 @@ lazy val commonSettings = Seq(
     "de.sciss"               %% "numbers"         % "0.1.3",
     "de.sciss"               %% "kollflitz"       % "0.2.0",
     "com.github.scopt"       %% "scopt"           % "3.5.0",
-    "de.sciss"               %% "fscape"          % "2.3.0",
+    "de.sciss"               %% "fscape"          % "2.4.1-SNAPSHOT",
     "org.apache.xmlgraphics" %  "batik-parser"    % "1.8",
     "org.swinglabs.swingx"   % "swingx-graphics"  % "1.6.5"
   )

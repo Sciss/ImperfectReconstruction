@@ -31,7 +31,7 @@ object ConvolveFSc {
                           groupIdx: Int = 5, fadeFrames: Int = 24 * 2 /* * 14 */, skipFrames: Int = 0,
                           zeroCrossings: Int = 0,
                           lagTime: Double = 1.0 - 1.0/24, fFltIn: File = baseDir / s"hp5-fft2d-16.aif",
-                          continuousScale: Boolean = false)
+                          continuousScale: Boolean = false, atan: Double = 4.0)
 
   def main(args: Array[String]): Unit = {
     val p = new scopt.OptionParser[Config]("Imperfect-Notebook Convolve") {
@@ -76,6 +76,10 @@ object ConvolveFSc {
       opt[Unit] ("continuous")
         .text ("Use continuous scaling operation")
         .action   { (_, c) => c.copy(continuousScale = true) }
+
+      opt[Double] ("atan")
+        .text ("Atan scale factor (default: 4.0)")
+        .action   { (v, c) => c.copy(atan = v) }
     }
     p.parse(args, Config()).fold(sys.exit(1)) { config =>
       run(config)
@@ -202,7 +206,7 @@ object ConvolveFSc {
         val rep2    = RepeatWindow(rep1, size = 1, num = kernelS  )
         rep2
       }
-      
+
       val env1Mat   = if (continuousScale) mkSawHigh(0.75) else mkSawLow(0.75)
       val env2Mat   = if (continuousScale) mkSawHigh(0.25) else mkSawLow(0.25)
 
@@ -212,8 +216,8 @@ object ConvolveFSc {
 //      val scale1l   = env1Mat.linexp(1, 0, 1, 0.5/kernel /* 0.01 */)
 //      val scale2l   = env2Mat.linexp(1, 0, 1, 0.5/kernel /* 0.01 */)
       import numbers.Implicits._
-      val scale1l   = (env1Mat * 8 - 4).atan.linlin(-4.0.atan: GE, 4.0.atan: GE, 0.5/kernel: GE, 1: GE)
-      val scale2l   = (env2Mat * 8 - 4).atan.linlin(-4.0.atan: GE, 4.0.atan: GE, 0.5/kernel: GE, 1: GE)
+      val scale1l   = (env1Mat * (2 * atan) - atan).atan.linlin(-atan.atan: GE, atan.atan: GE, 0.5/kernel: GE, 1: GE)
+      val scale2l   = (env2Mat * (2 * atan) - atan).atan.linlin(-atan.atan: GE, atan.atan: GE, 0.5/kernel: GE, 1: GE)
 //      val scale1l   = env1Mat.pow(2)
 //      val scale2l   = env2Mat.pow(2)
       val ampMat1l  = env1Mat // .pow(1.0/8)
