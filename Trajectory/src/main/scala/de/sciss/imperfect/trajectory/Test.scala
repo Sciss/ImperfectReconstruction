@@ -13,8 +13,6 @@
 
 package de.sciss.imperfect.trajectory
 
-import java.io.FileInputStream
-
 import de.sciss.file._
 import de.sciss.serial.{DataInput, DataOutput}
 
