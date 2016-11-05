@@ -63,7 +63,7 @@ object ConvolveFSc {
         .action   { (v, c) => c.copy(skipFrames = v) }
 
       opt[Double] ('n', "noise")
-        .text ("Noise amplitude. Default: 1.0)")
+        .text ("Noise amplitude. Default: 0.05)")
         .action   { (v, c) => c.copy(noiseAmp = v) }
 
       opt[Double] ('l', "lag-time")
@@ -84,7 +84,6 @@ object ConvolveFSc {
 
       opt[File] ('d', "output")
         .text ("Output directory")
-        .required()
         .action   { (v, c) => c.copy(outDir = v) }
     }
     p.parse(args, Config()).fold(sys.exit(1)) { config =>
@@ -172,7 +171,11 @@ object ConvolveFSc {
           .take(frameSize * (oddInRange.size * 4 - 2) * fadeFrames)
         (_res1, _res2)
       } else {
-        ???
+        val _res1 = mkBlackFrames(fadeFrames) ++ RepeatWindow(imgSeqIn1L, size = frameSize, num = 4 * fadeFrames)
+          .take(frameSize * (evenInRange.size * 4 - 1) * fadeFrames)
+        val _res2 = RepeatWindow(imgSeqIn2L, size = frameSize, num = 4 * fadeFrames).drop(frameSize * fadeFrames) ++
+          mkBlackFrames(fadeFrames)
+        (_res1, _res2)
       }
       val inSeqRep1 = if (skipFrames == 0) inSeqRep1a else inSeqRep1a.drop(skipFrames * frameSize)
       val inSeqRep2 = if (skipFrames == 0) inSeqRep2a else inSeqRep2a.drop(skipFrames * frameSize)
