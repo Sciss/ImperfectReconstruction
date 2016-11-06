@@ -34,7 +34,7 @@ object Resample {
                           zeroCrossings: Seq[Int] = Seq(15))
 
   def main(args: Array[String]): Unit = {
-    val p = new scopt.OptionParser[Config]("Imperfect-Notebook Convolve") {
+    val p = new scopt.OptionParser[Config]("Imperfect-Notebook Resample") {
       opt[File]('i', "input")
         .text ("Input template")
         .required()
