@@ -13,6 +13,7 @@
 
 package de.sciss.imperfect.trajectory
 
+import de.sciss.file._
 import de.sciss.serial.{DataInput, DataOutput}
 
 import scala.collection.breakOut
@@ -73,6 +74,22 @@ object Events {
 //  private[this] val RegPoly         = """polyline ((-?\d+[.]?\d+),(-?\d+[.]?\d+),(-?\d+[.]?\d+)\s)+Enter""".r
   private[this] val RegPoly         = """polyline (.+) Enter""".r
   private[this] val RegPolyPt       = s"""($rFloat),($rFloat),($rFloat)""".r
+
+  def readStd(max: Int = -1): Array[Event] = {
+    val fIn = userHome / "Documents" / "projects" / "Imperfect" / "cern_daten" / "CERN_trajectories.bin"
+    val dIn = DataInput.open(fIn)
+
+    print("Reading... ")
+
+    val events = try {
+      Events.read(dIn, max = max)
+    } finally {
+      dIn.close()
+    }
+    println("Done.")
+
+    events
+  }
 
   def parse(source: io.Source): Array[Event] = {
     val b   = Array.newBuilder[Event]
@@ -152,12 +169,13 @@ object Events {
     b.result()
   }
 
-  def read(in: DataInput): Array[Event] = {
+  def read(in: DataInput, max: Int = -1): Array[Event] = {
     val numEvents = in.readInt()
+    val numRead = if (max < 0) numEvents else math.min(max, numEvents)
 //    Vector.fill(numEvents)(Event.read(in))
-    val res = new Array[Event](numEvents)
+    val res = new Array[Event](numRead)
     var i = 0
-    while (i < numEvents) {
+    while (i < numRead) {
 //      if (i % 800 == 0) print('.')
       if (i % 100 == 0) {
         println(i)

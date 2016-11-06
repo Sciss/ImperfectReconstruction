@@ -77,18 +77,8 @@ object Histo {
   }
   
   def run(): Unit = {
-    val fIn = userHome / "Documents" / "projects" / "Imperfect" / "cern_daten" / "CERN_trajectories.bin"
-    val dIn = DataInput.open(fIn)
+    val events = Events.readStd()
 
-    print("Reading... ")
-
-    val events = try {
-      Events.read(dIn)
-    } finally {
-      dIn.close()
-    }
-    println("Done.")
-    
     val statNumPart     = HistoInt    ("numParticles")
     val statZFirst      = HistoDouble ("zFirst")
     val statZLast       = HistoDouble ("zLast")
@@ -123,11 +113,15 @@ object Histo {
     val statVertexYT    = HistoDouble ("vertexYT")
     val statVertexZT    = HistoDouble ("vertexZT")
     val statTrajX       = HistoDouble ("trajX")
-    statTrajX.min = -2000.0
-    statTrajX.max = +2000.0
+//    statTrajX.min = -2000.0
+//    statTrajX.max = +2000.0
+    statTrajX.min = -1.0
+    statTrajX.max = +1.0
     val statTrajY       = HistoDouble ("trajY")
-    statTrajY.min = -500.0
-    statTrajY.max = +500.0
+//    statTrajY.min = -500.0
+//    statTrajY.max = +500.0
+    statTrajY.min = -1.0
+    statTrajY.max = +1.0
     val statTrajZ       = HistoDouble ("trajZ")
 
     print("Analyzing... ")
@@ -168,9 +162,17 @@ object Histo {
           statVertexZT += v.trajError.z
         }
 
+        def map(i: Double, b: Double, p: Double) = (i / b).abs.pow(p) * i.signum
+
+//        val atanF   = 20
+//        val atanFA  = atanF.atan
+//        def map(i: Double, b: Double) = (i / b * atanF).atan / atanFA
+
         p.traj.foreach { point =>
-          statTrajX += point.x
-          statTrajY += point.y
+//          statTrajX += point.x
+          statTrajX += map(point.x, 2000, 1.0/2.3)
+//          statTrajY += point.y
+          statTrajY += map(point.y, 500, 1.0/1.7)
           statTrajZ += point.z
         }
       }

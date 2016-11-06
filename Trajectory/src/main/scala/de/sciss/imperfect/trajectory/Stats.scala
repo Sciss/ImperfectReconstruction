@@ -123,17 +123,7 @@ object Stats {
   }
 
   def run(): Unit = {
-    val fIn = userHome / "Documents" / "projects" / "Imperfect" / "cern_daten" / "CERN_trajectories.bin"
-    val dIn = DataInput.open(fIn)
-
-    print("Reading... ")
-
-    val events = try {
-      Events.read(dIn)
-    } finally {
-      dIn.close()
-    }
-    println("Done.")
+    val events = Events.readStd()
 
     val statNumPart     = IntStat     ("numParticles")
     val statZFirst      = DoubleStat  ("zFirst")
