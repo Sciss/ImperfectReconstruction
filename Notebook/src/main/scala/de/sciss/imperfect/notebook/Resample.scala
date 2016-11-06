@@ -28,7 +28,10 @@ import scala.swing.Swing
 object Resample {
   final case class Config(tempIn: File = file("in-%d.png"), tempOut: File = file("out-%d.png"),
                           startIndex: Int = 1, endIndex0: Int = 0, factor: Double = 4,
-                          noiseAmt: Double = 0.05, gamma: Double = 0.8)
+                          noiseAmt: Double = 0.05, gamma: Double = 0.8,
+                          kaiserBeta: Seq[Double] = Seq(6.5, 7.5, 8.5),
+                          rollOff: Seq[Double] = Seq(0.86),
+                          zeroCrossings: Seq[Int] = Seq(15))
 
   def main(args: Array[String]): Unit = {
     val p = new scopt.OptionParser[Config]("Imperfect-Notebook Convolve") {
@@ -61,6 +64,29 @@ object Resample {
         .required()
         .text ("Resampling factor")
         .action   { (v, c) => c.copy(factor = v) }
+
+      opt[Seq[Double]] ("kaiser-beta")
+        .text ("List of Kaiser window beta values (up to three)")
+        .validate {  v     =>
+          if (v.size > 3) failure("can only take up to three values")
+          else if (v.exists(x => x < 0 || x > 1)) failure("must be >= 0 and <= 1")
+          else success
+        }
+        .action   { (v, c) => c.copy(kaiserBeta = v) }
+
+      opt[Seq[Double]] ("roll-off")
+        .text ("List of filter roll off values (up to three)")
+        .validate {  v     =>
+          if (v.size > 3) failure("can only take up to three values")
+          else if (v.exists(x => x < 0 || x > 1)) failure("must be >= 0 and <= 1")
+          else success
+        }
+        .action   { (v, c) => c.copy(rollOff = v) }
+
+      opt[Seq[Int]] ("zero-crossings")
+        .text ("List of sinc zero crossing values (up to three)")
+        .validate {  v     => if (v.size <= 3) success else failure("can only take up to three values") }
+        .action   { (v, c) => c.copy(zeroCrossings = v) }
     }
     p.parse(args, Config()).fold(sys.exit(1)) { config =>
       run(config)
@@ -91,16 +117,20 @@ object Resample {
 
     val g = Graph {
       import graph._
-      val frameSize   = width.toLong * height
-      val indicesIn   = Line(startIndex, endIndex, endIndex - startIndex + 1)
-      val indicesOut  = Line(1, numFramesOut, numFramesOut)
-      val in          = ImageFileSeqIn(tempIn, numChannels = 3, indices = indicesIn)
-      val r           = ResampleWindow(in, size = frameSize, factor = factor, kaiserBeta = Seq[GE](6.5, 7.5, 8.5))
-      val n           = if (noiseAmt <= 0) r else  r + WhiteNoise(noiseAmt)
-      val g           = if (gamma == 1)    n else n.pow(gamma.reciprocal)
-      val sig         = g.max(0).min(1)
-      val fileType    = if (tempOut.ext.toLowerCase == "png") ImageFile.Type.PNG else ImageFile.Type.JPG
-      val specOut     = ImageFile.Spec(width = width, height = height, numChannels = 3, fileType = fileType)
+      val frameSize       = width.toLong * height
+      val indicesIn       = Line(startIndex, endIndex, endIndex - startIndex + 1)
+      val indicesOut      = Line(1, numFramesOut, numFramesOut)
+      val in              = ImageFileSeqIn(tempIn, numChannels = 3, indices = indicesIn)
+      val kaiserBetaGE    = kaiserBeta   .map(x => x: GE)
+      val rollOffGE       = rollOff      .map(x => x: GE)
+      val zeroCrossingsGE = zeroCrossings.map(x => x: GE)
+      val r               = ResampleWindow(in, size = frameSize, factor = factor,
+        kaiserBeta = kaiserBetaGE, rollOff = rollOffGE, zeroCrossings = zeroCrossingsGE)
+      val n               = if (noiseAmt <= 0) r else  r + WhiteNoise(noiseAmt)
+      val g               = if (gamma == 1)    n else n.pow(gamma.reciprocal)
+      val sig             = g.max(0).min(1)
+      val fileType        = if (tempOut.ext.toLowerCase == "png") ImageFile.Type.PNG else ImageFile.Type.JPG
+      val specOut         = ImageFile.Spec(width = width, height = height, numChannels = 3, fileType = fileType)
       ImageFileSeqOut(tempOut, specOut, indices = indicesOut, in = sig)
       Progress(Frames(sig \ 0) / (frameSize * numFramesOut), Metro(frameSize))
     }
