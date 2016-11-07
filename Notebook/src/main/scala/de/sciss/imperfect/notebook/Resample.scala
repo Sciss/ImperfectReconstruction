@@ -56,7 +56,7 @@ object Resample {
         .validate {  v     => if (v >= 0) success else failure("end-frame must be >= 0") }
 
       opt[Double] ('g', "gamma")
-        .text ("Gamma correction (< 1 darker, > 1 brighter, default: 0.5")
+        .text ("Gamma correction (< 1 darker, > 1 brighter, default: 0.8")
         .action   { (v, c) => c.copy(gamma = v) }
         .validate { v => if (v > 0) success else failure("gamma must be > 0") }
 
@@ -66,16 +66,16 @@ object Resample {
         .action   { (v, c) => c.copy(factor = v) }
 
       opt[Seq[Double]] ("kaiser-beta")
-        .text ("List of Kaiser window beta values (up to three)")
+        .text ("List of Kaiser window beta values (up to three); default: 6.5,7.5,8.5")
         .validate {  v     =>
           if (v.size > 3) failure("can only take up to three values")
-          else if (v.exists(x => x < 0 || x > 1)) failure("must be >= 0 and <= 1")
+          else if (v.exists(x => x < 0)) failure("must be >= 0")
           else success
         }
         .action   { (v, c) => c.copy(kaiserBeta = v) }
 
       opt[Seq[Double]] ("roll-off")
-        .text ("List of filter roll off values (up to three)")
+        .text ("List of filter roll off values (up to three); default: 0.86")
         .validate {  v     =>
           if (v.size > 3) failure("can only take up to three values")
           else if (v.exists(x => x < 0 || x > 1)) failure("must be >= 0 and <= 1")
@@ -84,9 +84,13 @@ object Resample {
         .action   { (v, c) => c.copy(rollOff = v) }
 
       opt[Seq[Int]] ("zero-crossings")
-        .text ("List of sinc zero crossing values (up to three)")
+        .text ("List of sinc zero crossing values (up to three); default: 15")
         .validate {  v     => if (v.size <= 3) success else failure("can only take up to three values") }
         .action   { (v, c) => c.copy(zeroCrossings = v) }
+
+      opt[Double] ("noise")
+        .text ("Amount of noise; default: 0.05")
+        .action   { (v, c) => c.copy(noiseAmt = v) }
     }
     p.parse(args, Config()).fold(sys.exit(1)) { config =>
       run(config)
