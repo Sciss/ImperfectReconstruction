@@ -107,6 +107,7 @@ object Resample {
     var gui: SimpleGUI = null
     val cfg = Control.Config()
     cfg.useAsync          = false
+    cfg.blockSize         = 8192
     cfg.progressReporter  = p => Swing.onEDT(gui.progress = p.total)
 
     val imgTest   = ImageIO.read(format(tempIn, startIndex))
@@ -130,8 +131,26 @@ object Resample {
       val kaiserBetaGE    = kaiserBeta   .map(x => x: GE)
       val rollOffGE       = rollOff      .map(x => x: GE)
       val zeroCrossingsGE = zeroCrossings.map(x => x: GE)
-      val r               = ResampleWindow(in, size = frameSize, factor = factor,
+      val r0              = ResampleWindow(in, size = frameSize, factor = factor,
         kaiserBeta = kaiserBetaGE, rollOff = rollOffGE, zeroCrossings = zeroCrossingsGE)
+
+      val fltSmpPerCrossing = 4096
+      val zeroCrossingsP  = Vector.tabulate(3)(i => zeroCrossings(i % zeroCrossings.size))
+      val rollOffP        = Vector.tabulate(3)(i => rollOff      (i % rollOff      .size))
+      val fltLenH         = (zeroCrossingsP zip rollOffP).map { case (zc, ro) =>
+        ((fltSmpPerCrossing * zc) / ro + 0.5).toInt
+      }
+      val minFltIncr      = fltSmpPerCrossing * math.min(1.0, factor)
+      val maxFltLenH      = fltLenH.map { flh => math.round(math.ceil(flh / minFltIncr)).toInt }
+      val PAD             = 1
+      val winLen          = maxFltLenH.map { mflh => (mflh << 1) + PAD }
+      val winLenD         = winLen.max - winLen.min
+      val r               = if (winLenD == 0) r0 else {
+        val blocksDly = (frameSize * winLenD / cfg.blockSize) + 1
+        println(s"To synchronize channels, need to buffer $winLenD frames or $blocksDly blocks.")
+        r0.elastic(blocksDly)
+      }
+
       val n               = if (noiseAmt <= 0) r else  r + WhiteNoise(noiseAmt)
       val g               = if (gamma == 1)    n else n.pow(gamma.reciprocal)
       val sig             = g.max(0).min(1)
