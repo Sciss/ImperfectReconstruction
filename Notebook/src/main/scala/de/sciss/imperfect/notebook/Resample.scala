@@ -145,7 +145,8 @@ object Resample {
       val PAD             = 1
       val winLen          = maxFltLenH.map { mflh => (mflh << 1) + PAD }
       // XXX TODO --- this doesn't make sense, should be (max - min) * 2; but needs more; why?
-      val winLenD         = winLen.max // (winLen.max - winLen.min) * 2
+//      val winLenD         = winLen.max // (winLen.max - winLen.min) * 2
+      val winLenD         = (winLen.max - winLen.min) * 4 // what is the bloody problem???
       val r               = if (winLenD == 0) r0 else {
         val blocksDly = (frameSize * winLenD / cfg.blockSize) + 1
         println(s"To synchronize channels, need to buffer $winLenD frames or $blocksDly blocks.")
