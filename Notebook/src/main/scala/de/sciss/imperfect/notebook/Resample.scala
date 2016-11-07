@@ -144,12 +144,20 @@ object Resample {
       val maxFltLenH      = fltLenH.map { flh => math.round(math.ceil(flh / minFltIncr)).toInt }
       val PAD             = 1
       val winLen          = maxFltLenH.map { mflh => (mflh << 1) + PAD }
-      val winLenD         = winLen.max - winLen.min
+      // XXX TODO --- this doesn't make sense, should be (max - min) * 2; but needs more; why?
+      val winLenD         = winLen.max // (winLen.max - winLen.min) * 2
       val r               = if (winLenD == 0) r0 else {
         val blocksDly = (frameSize * winLenD / cfg.blockSize) + 1
         println(s"To synchronize channels, need to buffer $winLenD frames or $blocksDly blocks.")
         r0.elastic(blocksDly)
       }
+
+//      (r0 \ 0).poll(Metro(frameSize), "in -1")
+//      (r0 \ 1).poll(Metro(frameSize), "in -2")
+//      (r0 \ 2).poll(Metro(frameSize), "in -3")
+//      (r  \ 0).poll(Metro(frameSize), "out-1")
+//      (r  \ 1).poll(Metro(frameSize), "out-2")
+//      (r  \ 2).poll(Metro(frameSize), "out-3")
 
       val n               = if (noiseAmt <= 0) r else  r + WhiteNoise(noiseAmt)
       val g               = if (gamma == 1)    n else n.pow(gamma.reciprocal)
