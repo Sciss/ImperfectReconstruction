@@ -119,6 +119,8 @@ object Resample {
     val numFramesIn = endIndex - startIndex + 1
     val numFramesOut = math.ceil(numFramesIn * factor).toInt
 
+    tempOut.parentOption.foreach(_.mkdirs())
+
     val g = Graph {
       import graph._
       val frameSize       = width.toLong * height
