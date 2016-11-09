@@ -37,7 +37,10 @@ object DifferenceProcess {
                     thresh      : Double  = 0.1,
                     redGain     : Double  = 1.0,
                     greenGain   : Double  = 1.0,
-                    blueGain    : Double  = 1.0
+                    blueGain    : Double  = 1.0,
+                    frameStep   : Int     = 1,
+                    rotate      : Int     = 0,
+                    autoLevels  : Boolean = false
                    )
 
 //  val baseDirOut    = userHome / "Documents" / "projects" / "Imperfect" / (if (STRANGE) "site-9s" else "site-9")
@@ -65,9 +68,18 @@ object DifferenceProcess {
       opt[Double]("threshold")         action { (x, c) => c.copy(thresh = x) }
       opt[Int   ]('n', "seq-len")      text "Sliding window length" action { (x, c) => c.copy(seqLen = x) }
       opt[Int   ]('m', "median-side")  text "Median side length" action { (x, c) => c.copy(medianSide = x) }
+      opt[Int   ]("frame-step")
+          .text ("Step in output frames (default: 1)")
+          .validate { i => if (i > 0) success else failure(s"frame-step must be > 0") }
+          .action { (x, c) => c.copy(frameStep = x) }
       opt[Double]("red-gain")          action { (x, c) => c.copy(redGain   = x) }
       opt[Double]("green-gain")        action { (x, c) => c.copy(greenGain = x) }
       opt[Double]("blue-gain")         action { (x, c) => c.copy(blueGain  = x) }
+      opt[Int   ]("rotate")
+          .text("Rotate output; allowed values: 0 (none), 90 (clock-wise), -90 (anti-clock-wise), 180")
+          .validate(i => if (-90 to 180 by 90 contains i) success else failure("Only 0, 90, -90, 180 allowed"))
+          .action { (x, c) => c.copy(rotate    = x) }
+      opt[Unit  ]("auto-levels") action { (_, c) => c.copy(autoLevels = true) }
     }
     parser.parse(args, Config()).fold(sys.exit(1))(run)
   }
@@ -128,7 +140,7 @@ object DifferenceProcess {
         val r   = ChannelProxy(in, 0)
         val g   = ChannelProxy(in, 1)
         val b   = ChannelProxy(in, 2)
-        (0.299 * r.squared + 0.587 * g.squared + 0.114 * b.squared).sqrt
+        (r.squared * 0.299 + g.squared * 0.587 + b.squared * 0.114).sqrt
       }
 
       def quarter(in: GE): GE = {
@@ -221,7 +233,7 @@ object DifferenceProcess {
       //      lumT    .poll(1.0/frameSize, "lumT    ")
       //      min     .poll(1.0/frameSize, "min     ")
       //      max     .poll(1.0/frameSize, "max     ")
-      maskBlur.poll(frameSize, "maskBlur")
+      // maskBlur.poll(frameSize, "maskBlur")
 
       val sel     = maskBlur * dly
       //      val expose  = RunningWindowMax(sel, size = frameSize)
@@ -250,20 +262,50 @@ object DifferenceProcess {
           (exposeSlid * gain1).max(0.0).min(1.0).pow(gamma)
         }
 
-        val spec  = ImageFile.Spec(width = width, height = height, numChannels = /* 1 */ 3,
-          fileType = ImageFile.Type.JPG /* PNG */, sampleFormat = ImageFile.SampleFormat.Int8,
-          quality = 100)
-//        val indicesOut = indices.drop(sideLen).take(idxRange.size - (medianLen - 1))
-        val idxRangeOut = 1 to idxRange.size - (medianLen - 1)
-        val indicesOut = idxRangeOut.map(x => x: GE).reduce(_ ++ _)
-          ImageFileSeqOut(template = templateOut, spec = spec, in = sig, indices = indicesOut)
+        val tpe         = if (templateOut.ext == "png") ImageFile.Type.PNG else ImageFile.Type.JPG
+        val stopFrame   = (idxRange.size - (medianLen - 1)) / frameStep
+        val idxRangeOut = 1 to stopFrame
+        val sigOut0     = if (frameStep == 1) sig else {
+          ResizeWindow(sig, size = frameSizeL * frameStep, start = 0, stop = -(frameSizeL * (frameStep - 1)))
+        }
+        val sigOut1 = rotate match {
+          case   0 => sigOut0
+          case  90 => TransposeMatrix(sigOut0, rows = height, columns = width)
+          case -90 =>
+            val r1 = TransposeMatrix(sigOut0, rows = height, columns = width )
+            ReverseWindow(r1, frameSize)
+          case 180 => ReverseWindow(sigOut0, frameSize)
+        }
+        val sigOut = if (!autoLevels) sigOut1 else {
+          val minDropC  = RunningMin(sigOut1, Metro(frameSize)).drop(frameSize - 1)
+          val maxDropC  = RunningMax(sigOut1, Metro(frameSize)).drop(frameSize - 1)
+          val minDrop   = (minDropC \ 0).min(minDropC \ 1).min(minDropC \ 2)
+          val maxDrop   = (maxDropC \ 0).max(maxDropC \ 1).max(maxDropC \ 2)
+          val min       = Gate(minDrop, Metro(frameSize))
+          val max       = Gate(maxDrop, Metro(frameSize))
+          val el        = sigOut1.elastic((frameSizeL * 2) / streamCfg.blockSize + 1)
+          (el - min) / (max - min)
+        }
+
+        val isHalfRot = rotate == 90 || rotate == -90
+        val spec  = ImageFile.Spec(
+          width  = if (isHalfRot) height else width,
+          height = if (isHalfRot) width  else height,
+          numChannels = 3,
+          fileType = tpe,
+          sampleFormat = ImageFile.SampleFormat.Int8, quality = 100
+        )
+        val indicesOut  = idxRangeOut.map(x => x: GE).reduce(_ ++ _)
+        ImageFileSeqOut(template = templateOut, spec = spec, in = sigOut, indices = indicesOut)
+        Progress(Frames(sigOut) / idxRangeOut.size, Metro(frameSize))
 
       } else {
         val last  = expose.take(frameSizeL * (numInput - (medianLen - 1))).takeRight(frameSize)
         // min.take(frameSize * (numInput - (medianLen - 1))).takeRight(frameSize)
         val sig   = normalize(last)
+        val tpe   = if (fOut.ext == "png") ImageFile.Type.PNG else ImageFile.Type.JPG
         val spec  = ImageFile.Spec(width = width, height = height, numChannels = /* 1 */ 3,
-          fileType = ImageFile.Type.JPG /* PNG */, sampleFormat = ImageFile.SampleFormat.Int8,
+          fileType = tpe, sampleFormat = ImageFile.SampleFormat.Int8,
           quality = 100)
         ImageFileOut(file = fOut, spec = spec, in = sig)
         // "full resolution copy"
