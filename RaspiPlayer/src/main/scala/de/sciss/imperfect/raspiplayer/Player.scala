@@ -13,7 +13,7 @@
 
 package de.sciss.imperfect.raspiplayer
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 
 import de.sciss.file._
 import de.sciss.osc
@@ -42,7 +42,7 @@ final class Player(config: Config) {
       import sys.process._
       Seq("omxplayer", "--loop", config.testVideo.path).run()
 
-    case p =>
+    case _ =>
       Console.err.println(s"Unknown OSC message $p from control")
   }
 
