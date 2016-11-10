@@ -23,15 +23,16 @@ import de.sciss.file._
 
 object MakePostcards {
   val baseDirInt    = userHome / "Documents" / "projects" / "Imperfect"
-  val baseDirExt   = file("/media") / "hhrutz" / "AC6E5D6F6E5D3376" / "projects" / "Imperfect"
+  val baseDirExt    = file("/media") / "hhrutz" / "AC6E5D6F6E5D3376" / "projects" / "Imperfect"
+  val flyerDir      = baseDirExt / "logistics" / "flyer"
 
   case class Config(
                      davidDir   : File    = baseDirInt / "david" / "causality_report",
                      // hhDir   : File    = baseDir / "site-2out_cover_final",
                      hhDir      : File    = baseDirExt / "site-2out_cover_final",
-                     pngOutTemp : File    = baseDirExt / "logistics" / "flyer" / "front" / "front-%d.png",
-                     pdfOutTemp : File    = baseDirExt / "logistics" / "flyer" / "front-pdf" / "front-%d.pdf",
-                     cropMarks  : File    = baseDirExt / "logistics" / "flyer" / "postcard-front-empty.pdf",
+                     pngOutTemp : File    = flyerDir / "front" / "front-%d.png",
+                     pdfOutTemp : File    = flyerDir / "front-pdf" / "front-%d.pdf",
+                     cropMarks  : File    = flyerDir / "postcard-front-empty.pdf",
                      strokeWidth: Double  = 2.0,
                      gamma      : Double  = 2.0,
                      innerWidth : Int     = 816, // 826
@@ -41,7 +42,8 @@ object MakePostcards {
                      tagWidth   : Int     = 5,
                      tagHeight  : Int     = 15,
                      tagMargin  : Int     = (6 / 25.4 * 200 + 0.5).toInt,
-                     renderPDF  : Boolean = true
+                     renderPDF  : Boolean = true,
+                     assembly   : Option[File] = Some(flyerDir / "front-all.pdf")
                  )
 
   def main(args: Array[String]): Unit = {
@@ -77,8 +79,9 @@ object MakePostcards {
     val compMul   = new MultiplyGammaComposite
 
 //    outTemp.parentOption.foreach(_.mkdirs())
+    val zipped    = davidIn zip hhIn
 
-    (davidIn zip hhIn).zipWithIndex.foreach { case ((svgIn, siteIn), frameIdx0) =>
+    zipped.zipWithIndex.foreach { case ((svgIn, siteIn), frameIdx0) =>
       val frameIdx  = frameIdx0 + 1
       val composedF = applyTemplate(pngOutTemp, frameIdx)
 
@@ -207,6 +210,29 @@ object MakePostcards {
 
       } else {
         if (renderPDF) println(s"Skipping '${pdfF.name}' - file already exists.")
+      }
+    }
+
+    assembly.foreach { assemblyF =>
+      if (!assemblyF.exists()) {
+        println(s"Assembling... '${assemblyF.name}'")
+
+        /*
+        gs -sDEVICE=pdfwrite -dNOPAUSE -dBATCH -dSAFER -sOutputFile=combined.pdf first.pdf second.pdf ...
+         */
+
+        val inPaths = (1 to zipped.size).map(frameIdx => applyTemplate(pdfOutTemp, frameIdx).name)
+        val wd      = pdfOutTemp.parent
+//        val cmdAss  = Seq("gs", "-sDEVICE=pdfwrite", "-dPDFSETTINGS=/printer", "-dNOPAUSE", "-dBATCH", "-dSAFER",
+//          s"-sOutputFile=${assemblyF.path}") ++ inPaths
+
+        val cmdAss = "pdftk" +: inPaths :+ "cat" :+ "output" :+ assemblyF.path
+
+        import sys.process._
+        Process(cmdAss, wd).!!
+
+      } else {
+        println(s"Skipping '${assemblyF.name}' - file already exists.")
       }
     }
   }
