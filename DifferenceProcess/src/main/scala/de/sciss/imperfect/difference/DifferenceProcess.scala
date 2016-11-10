@@ -297,7 +297,7 @@ object DifferenceProcess {
         )
         val indicesOut  = idxRangeOut.map(x => x: GE).reduce(_ ++ _)
         ImageFileSeqOut(template = templateOut, spec = spec, in = sigOut, indices = indicesOut)
-        Progress(Frames(sigOut) / idxRangeOut.size, Metro(frameSize))
+        Progress(Frames(sigOut) / (frameSizeL * idxRangeOut.size), Metro(frameSize))
 
       } else {
         val last  = expose.take(frameSizeL * (numInput - (medianLen - 1))).takeRight(frameSize)
