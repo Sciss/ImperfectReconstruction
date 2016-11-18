@@ -26,8 +26,8 @@ object DrawSome {
   }
 
   def run(events: Array[Event]): Unit = {
-    val w = 1440
-    val h = w * 540 / 3840
+    val w = 1024 // 1440
+    val h =  768 // w * 540 / 3840
     val c = new Component {
       preferredSize = new Dimension(w, h)
       opaque        = true
@@ -51,7 +51,7 @@ object DrawSome {
       open()
     }
 
-    val t = new Timer(25, Swing.ActionListener { _ =>
+    val t = new Timer(2000, Swing.ActionListener { _ =>
       c.repaint()
     })
     t.setRepeats(true)
@@ -68,20 +68,26 @@ object DrawSome {
 //    def mapV(i: Double) = (math.sqrt(math.abs(i /  500)) * i.signum + 1) * hh
 
     def mapXH(i: Double) = (math.pow(math.abs(i / 2000), 1.0/3.0) * i.signum + 1) * wh
-    def mapXV(i: Double) = (math.pow(math.abs(i / 2000), 1.0/3.0) * i.signum + 1) * hh
+//    def mapXV(i: Double) = (math.pow(math.abs(i / 2000), 1.0/3.0) * i.signum + 1) * hh
+    def mapXV(i: Double) = (math.pow(math.abs(i / 2000), 1.0/3.0) * i.signum + 1.25) * hh * 0.9
     def mapYV(i: Double) = (math.pow(math.abs(i /  500), 1.0/3.0) * i.signum + 1) * hh
 
-    def mapZH(i: Double) = i.linlin(-1000, 1000, 0, w)
+//    def mapZH(i: Double) = i.linlin(-1000, 1000, 0, wh)
+//    def mapZH(i: Double) = i.linlin(-1000, 2500, 0, wh)
+    def mapZH(i: Double) = i.linlin(-550, 2250, 0, wh)
 
-    val numEvt  = 10
+    val numEvt  = 1 // 10
     var i       = animCount % (events.length - numEvt)
     animCount += 1
     val stop  = i + numEvt
     while (i < stop) {
       val ev = events(i)
       val px = ev.particles
-      var j = 0
-      while (j < px.length) {
+      val psz0 = math.min(3, px.length)
+//      var j = 0
+      var j = util.Random.nextInt(px.length - psz0 + 1)
+      val psz = math.min(j + psz0, px.length)
+      while (j < psz) {
         val p = px(j)
         var k = 1
         val pt = p.traj
@@ -99,6 +105,8 @@ object DrawSome {
 //            val y1 = mapYV(p1.y)
             val y1 = mapXV(p1.x)
 //            g.drawLine(x0.toInt, y0.toInt, x1.toInt, y1.toInt)
+            val hue = k.linlin(0, pt.length, 0, 1)
+            g.setColor(Color.getHSBColor(hue, 1, 1))
             g.drawLine(x0.toInt, y0.toInt + y2, x1.toInt, y1.toInt + y2)
             x0 = x1
             y0 = y1
