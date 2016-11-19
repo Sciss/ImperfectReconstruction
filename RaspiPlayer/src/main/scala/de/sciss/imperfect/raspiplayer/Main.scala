@@ -17,10 +17,12 @@ import de.sciss.file.File
 
 object Main {
   def main(args: Array[String]): Unit = {
+    val myIP = Config.checkIP()
+
     val p = new scopt.OptionParser[Config]("Imperfect-RaspiPlayer") {
       opt[File]("test-video")
         .text ("Test video file")
-        .required()
+//        .required()
         .action { (f, c) => c.copy(testVideo = f) }
 
 //      opt[Int] ('s', "start-frame")
@@ -30,7 +32,7 @@ object Main {
 
       opt[String] ('h', "host")
         .text ("This host's IP address")
-        .required()
+//        .required()
         .action   { (v, c) => c.copy(thisHost = v) }
 
       opt[Unit] ('d', "dump-osc")
@@ -41,7 +43,8 @@ object Main {
         .text ("Instance is control center")
         .action   { (v, c) => c.copy(isControl = true) }
     }
-    p.parse(args, Config()).fold(sys.exit(1)) { config =>
+    val config0 = Config(thisHost = myIP, isControl = myIP == Config.controlIP)
+    p.parse(args, config0).fold(sys.exit(1)) { config =>
       // new Convolve(config)
       if (config.isControl) {
         log("Creating control")

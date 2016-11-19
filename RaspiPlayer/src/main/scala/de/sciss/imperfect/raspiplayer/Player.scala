@@ -19,6 +19,7 @@ import de.sciss.file._
 import de.sciss.osc
 import de.sciss.osc.{Packet, UDP}
 
+import scala.util.Try
 import scala.util.control.NonFatal
 
 final class Player(config: Config) {
@@ -41,6 +42,14 @@ final class Player(config: Config) {
     case osc.Message("/test") =>
       import sys.process._
       Seq("omxplayer", "--loop", config.testVideo.path).run()
+
+    case osc.Message("/shell", cmd @ _*) =>
+      val cmdS = cmd.map(_.toString)
+      println("Executing shell command:")
+      println(cmdS.mkString(" "))
+      import sys.process._
+      val result = Try(cmdS.!!).toOption.getOrElse("ERROR")
+      client ! osc.Message("/shell_reply", result)
 
     case _ =>
       Console.err.println(s"Unknown OSC message $p from control")
