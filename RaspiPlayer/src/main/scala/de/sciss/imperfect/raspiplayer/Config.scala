@@ -69,7 +69,7 @@ object Config {
                |static routers=192.168.0.1
                |static domain_name_servers=192.168.0.1
                |""".stripMargin
-          val contents = init + tail
+          val contents = s"$init\n$tail"
 
           val fOut  = new FileOutputStream(confPath)
           fOut.write(contents.getBytes("UTF-8"))
