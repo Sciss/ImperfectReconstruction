@@ -59,6 +59,7 @@ object Config {
           val confPath = "/etc/dhcpcd.conf"
           println(s"Designated IP is $desiredIP. Updating /etc/dhcpcd.conf...")
           val header = "interface eth0"
+          Seq("cp", confPath, s"$confPath.BAK").!
           val init = io.Source.fromFile(file(confPath)).getLines().toList
             .takeWhile(ln => ln.trim() != header).mkString("\n")
           val tail =
