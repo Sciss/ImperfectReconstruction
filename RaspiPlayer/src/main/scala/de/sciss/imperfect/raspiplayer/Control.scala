@@ -18,7 +18,9 @@ import java.net.{InetSocketAddress, SocketAddress}
 import de.sciss.osc
 import de.sciss.osc.{Packet, UDP}
 
+import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.util.Random
+import scala.util.control.NonFatal
 
 final class Control(config: Config) {
   import config._
@@ -27,10 +29,9 @@ final class Control(config: Config) {
 
   private[this] val clients = {
     // /etc/dhcpcd.conf
-    val res = new Array[InetSocketAddress](3)
-    res(0) = new InetSocketAddress("192.168.0.11", clientPort)
-    res(1) = new InetSocketAddress("192.168.0.12", clientPort)
-    res(2) = new InetSocketAddress("192.168.0.13", clientPort)
+    val res = Array.tabulate[InetSocketAddress](8) { i =>
+      new InetSocketAddress(s"192.168.0.${11 + i}", clientPort)
+    }
     res
   }
 
@@ -53,9 +54,44 @@ final class Control(config: Config) {
     transmitter.connect()
   }
 
-  private[this] var clientsReady = false
+//  private[this] var clientsReady = false
 
-  private[this] def received(p: Packet, addr: SocketAddress): Unit = {
+  private def spawnVideo(): Unit = {
+//    clientsReady = true
+//    val cmdTest = osc.Message("/test")
+    var j = 0
+    while (j < clients.length) {
+      if (clientStatus(j) != Unknown) {
+        clientStatus(j) = Playing
+      }
+      j += 1
+    }
+
+    val vidIds: Vec[Int] = random.shuffle[Int, Vec](1 to 8)
+
+    j = 0
+    while (j < clients.length) {
+      if (clientStatus(j) != Unknown) {
+        val vidId = vidIds(j % vidIds.size)
+        val vid   = s"site/site$vidId.mp4"
+        val cmd = Play(file = vid, start = 0f, duration = 30f, orientation = 0, fadeIn = 4f, fadeOut = 4f)
+        try {
+          transmitter.send(cmd, clients(j))
+        } catch {
+          case NonFatal(ex) =>
+            ex.printStackTrace()
+            clientStatus(j) = Idle
+        }
+      }
+      j += 1
+    }
+  }
+
+  private[this] var isFirstReady = true
+
+  private[this] val numClientsC = math.min(clients.length, config.numClients)
+
+  private def received(p: Packet, addr: SocketAddress): Unit = {
     var clientIdx = -1
     var i = 0
     while (i < clients.length && clientIdx < 0) {
@@ -69,15 +105,12 @@ final class Control(config: Config) {
         case osc.Message("/status", statusId: String) =>
           val status = Status(statusId)
           clientStatus(clientIdx) = status
-          if (!clientsReady && clientStatus.forall(_ == Idle)) {
-            log("All clients are ready!")
-            clientsReady = true
-            val cmdTest = osc.Message("/test")
-            var j = 0
-            while (j < clients.length) {
-              transmitter.send(cmdTest, clients(j))
-              j += 1
+          if (/* !clientsReady && */ clientStatus.count(_ == Idle) == numClientsC) {
+            if (isFirstReady) {
+              log("All clients are ready!")
+              isFirstReady = false
             }
+            spawnVideo()
           }
 
         case _ =>

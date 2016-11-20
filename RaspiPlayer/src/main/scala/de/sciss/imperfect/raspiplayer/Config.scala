@@ -13,8 +13,8 @@
 
 package de.sciss.imperfect.raspiplayer
 
-import java.io.{FileInputStream, FileOutputStream}
-import java.net.{Inet4Address, InetAddress}
+import java.io.FileOutputStream
+import java.net.InetAddress
 
 import de.sciss.file._
 
@@ -89,4 +89,5 @@ object Config {
   }
 }
 final case class Config(isControl: Boolean, thisHost: String, clientPort: Int = 57120,
-                        testVideo: File = userHome / "Videos" / "test.mp4", dumpOSC: Boolean = false)
+                        baseDir: File = userHome/"Documents"/"projects"/"Imperfect"/"inner_space",
+                        numClients: Int = 8, dumpOSC: Boolean = false, small: Boolean = false)

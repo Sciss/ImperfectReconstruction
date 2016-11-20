@@ -17,34 +17,41 @@ import de.sciss.file.File
 
 object Main {
   def main(args: Array[String]): Unit = {
-    val myIP = Config.checkIP()
+    val myIP    = Config.checkIP()
+    val default = Config(thisHost = myIP, isControl = myIP == Config.controlIP)
 
     val p = new scopt.OptionParser[Config]("Imperfect-RaspiPlayer") {
-      opt[File]("test-video")
-        .text ("Test video file")
+      opt[File]("base-dir")
+        .text (s"Base directory (default: ${default.baseDir})")
 //        .required()
-        .action { (f, c) => c.copy(testVideo = f) }
-
-//      opt[Int] ('s', "start-frame")
-//        .text ("Start frame index")
-//        .action   { (v, c) => c.copy(startFrame = v) }
-//        .validate {  v     => if (v >= 0) success else failure("start-frame must be >= 0") }
+        .action { (f, c) => c.copy(baseDir = f) }
 
       opt[String] ('h', "host")
-        .text ("This host's IP address")
+        .text (s"This host's IP address (default: ${default.thisHost})")
 //        .required()
         .action   { (v, c) => c.copy(thisHost = v) }
 
       opt[Unit] ('d', "dump-osc")
-        .text ("Enable OSC dump")
+        .text (s"Enable OSC dump (default ${default.dumpOSC})")
         .action   { (v, c) => c.copy(dumpOSC = true) }
 
       opt[Unit] ('c', "control")
-        .text ("Instance is control center")
+        .text (s"Instance is control center (default ${default.isControl})")
         .action   { (v, c) => c.copy(isControl = true) }
+
+      opt[Int] ("client-port")
+        .text (s"Client OSC port (default ${default.clientPort})")
+        .action   { (v, c) => c.copy(clientPort = v) }
+
+      opt[Int] ('n', "num-clients")
+        .text (s"Number of clients connected (default ${default.numClients})")
+        .action   { (v, c) => c.copy(numClients = v) }
+
+      opt[Unit] ("small")
+        .text (s"Small display for debugging (default ${default.small})")
+        .action   { (v, c) => c.copy(small = true) }
     }
-    val config0 = Config(thisHost = myIP, isControl = myIP == Config.controlIP)
-    p.parse(args, config0).fold(sys.exit(1)) { config =>
+    p.parse(args, default).fold(sys.exit(1)) { config =>
       // new Convolve(config)
       if (config.isControl) {
         log("Creating control")
