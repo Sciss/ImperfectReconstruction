@@ -52,14 +52,20 @@ object Main {
         .action   { (v, c) => c.copy(small = true) }
     }
     p.parse(args, default).fold(sys.exit(1)) { config =>
-      // new Convolve(config)
-      if (config.isControl) {
+      val controlOpt = if (!config.isControl) None else {
         log("Creating control")
-        new Control(config).start()
+        val ctl = new Control(config)
+        ctl.start()
+        Some(ctl)
       }
       log("Creating player")
-      new Player(config).start()
+      new Player(config, controlOpt).start()
       log("Ready.")
     }
+  }
+
+  def shutdown(): Unit = {
+    import sys.process._
+    Seq("sudo", "shutdown", "now").run()
   }
 }

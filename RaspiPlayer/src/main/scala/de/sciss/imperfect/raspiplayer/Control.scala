@@ -54,6 +54,22 @@ final class Control(config: Config) {
     transmitter.connect()
   }
 
+  def quit(): Unit = {
+    log("Quitting...")
+    var j = 0
+    val cmd = osc.Message("/shutdown")
+      while (j < clients.length) {
+      try {
+        transmitter.send(cmd, clients(j))
+      } catch {
+        case NonFatal(ex) =>
+          ex.printStackTrace()
+      }
+      j += 1
+    }
+    Main.shutdown()
+  }
+
 //  private[this] var clientsReady = false
 
   private def spawnVideo(): Unit = {

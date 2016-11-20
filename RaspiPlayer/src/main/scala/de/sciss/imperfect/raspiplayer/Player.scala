@@ -13,6 +13,7 @@
 
 package de.sciss.imperfect.raspiplayer
 
+import java.awt.event.{KeyAdapter, KeyEvent}
 import java.awt.{EventQueue, Frame, GraphicsEnvironment, Point}
 import java.awt.image.BufferedImage
 import java.net.InetSocketAddress
@@ -24,7 +25,7 @@ import de.sciss.osc.{Packet, UDP}
 import scala.util.Try
 import scala.util.control.NonFatal
 
-final class Player(config: Config) {
+final class Player(config: Config, control: Option[Control]) {
   @volatile
   private[this] var status: Status = Idle
 
@@ -128,13 +129,24 @@ final class Player(config: Config) {
         val omx = cmd.run()
         val t1  = System.currentTimeMillis()
 
+        // it takes a moment till the dbus client is registered.
+        // if we run the script with the 'status' command, it will
+        // have an error code of 1 while the client is not yet
+        // visible, and zero when it's there.
+        var launched = false
+        while (!launched && (System.currentTimeMillis() - t1 < 2000)) {
+          val res = Seq(script.path, "status").!
+          launched = res == 0
+          if (!launched) Thread.sleep(0)
+        }
+
         if (pl.fadeIn > 0) {
           fadeIn(pl.fadeIn)
         }
         val t2      = System.currentTimeMillis()
         val secFdIn = (t2 - t1) / 1000.0
         val secRem  = pl.duration - secFdIn - pl.fadeOut
-        val milRem  = (secRem * 1000).toLong
+        val milRem  = math.max(0L, (secRem * 1000).toLong)
         Thread.sleep(milRem)
         if (pl.fadeOut > 0) {
           fadeOut(pl.fadeOut)
@@ -162,9 +174,23 @@ final class Player(config: Config) {
     val w = new Frame(null, screenConf) {
       setUndecorated  (true)
     }
+    w.addKeyListener(new KeyAdapter {
+      override def keyTyped  (e: KeyEvent): Unit = ()
+      override def keyPressed(e: KeyEvent): Unit = {
+        e.getKeyCode match {
+          case KeyEvent.VK_ESCAPE => control.foreach(_.quit())
+//          case KeyEvent.VK_R      => drawRect = !drawRect // ; w.repaint()
+//          case KeyEvent.VK_T      => drawText = !drawText
+//          case KeyEvent.VK_A      => animate  = !animate
+//          case KeyEvent.VK_C      => controlWindow.open()
+
+          case _ =>
+        }
+      }
+    })
     w.setSize(screenConf.getBounds.getSize)
     screen.setFullScreenWindow(w)
-    // w.requestFocus()
+    w.requestFocus()
 
     // "hide" cursor
     val cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)
