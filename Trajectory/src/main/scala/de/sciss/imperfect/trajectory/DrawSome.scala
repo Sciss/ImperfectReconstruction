@@ -108,6 +108,7 @@ object DrawSome {
             val hue = k.linlin(0, pt.length, 0, 1)
             g.setColor(Color.getHSBColor(hue, 1, 1))
             g.drawLine(x0.toInt, y0.toInt + y2, x1.toInt, y1.toInt + y2)
+            g.drawLine(x1.toInt, y1.toInt - 4 + y2, x1.toInt, y1.toInt + 4 + y2)
             x0 = x1
             y0 = y1
             k += 1
