@@ -40,20 +40,23 @@ object Play {
 /** OSC command for a client to play a video segment.
   *
   * @param file         name of video
+  * @param delay        optional (black) delay in seconds
   * @param start        start time offset in seconds
   * @param duration     duration in seconds
   * @param orientation  orientation: 0, 90, 180, 270
   * @param fadeIn       fade in duration in seconds (or zero for no fade)
   * @param fadeOut      fade out duration in seconds (or zero for no fade)
   */
-final case class Play(file: String, start: Float, duration: Float, orientation: Int, fadeIn: Float, fadeOut: Float)
-  extends osc.Message("/play", file, start, duration, orientation, fadeIn, fadeOut)
+final case class Play(file: String, delay: Float, start: Float, duration: Float, orientation: Int,
+                      fadeIn: Float, fadeOut: Float)
+  extends osc.Message("/play", file, delay, start, duration, orientation, fadeIn, fadeOut)
 
 object PlayMessage {
   def unapply(m: osc.Message): Option[Play] = m match {
-    case osc.Message("/play", file: String, start: Float, duration: Float, orientation: Int,
+    case osc.Message("/play", file: String, delay: Float, start: Float, duration: Float, orientation: Int,
     fadeIn: Float, fadeOut: Float) =>
-      Some(Play(file, start, duration, orientation, fadeIn, fadeOut))
+      Some(Play(file = file, delay = delay, start = start, duration = duration, orientation = orientation,
+        fadeIn = fadeIn, fadeOut = fadeOut))
     case _ => None
   }
 }

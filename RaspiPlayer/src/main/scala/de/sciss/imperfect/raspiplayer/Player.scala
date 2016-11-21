@@ -14,8 +14,8 @@
 package de.sciss.imperfect.raspiplayer
 
 import java.awt.event.{KeyAdapter, KeyEvent}
-import java.awt.{Color, EventQueue, Frame, GraphicsEnvironment, Point}
 import java.awt.image.BufferedImage
+import java.awt.{Color, EventQueue, Font, Frame, Graphics, GraphicsEnvironment, Point}
 import java.net.InetSocketAddress
 
 import de.sciss.file._
@@ -35,13 +35,16 @@ final class Player(config: Config, control: Option[Control]) {
 
   private[this] val playSync = new AnyRef
 
-  private[this] val client = {
+  private def mkClient(): UDP.Client = {
     val c   = UDP.Config()
     c.localSocketAddress = new InetSocketAddress(config.thisHost /* InetAddress.getLocalHost() */, config.clientPort)
     val res = UDP.Client(new InetSocketAddress("192.168.0.11", 57110), c)
     res.action = received
     res
   }
+
+  @volatile
+  private[this] var client: UDP.Client = _
 
   private[this] val script = config.baseDir/"dbuscontrol.sh"
   require(script.canExecute, "dbuscontrol.sh script is not executable!")
@@ -50,9 +53,11 @@ final class Player(config: Config, control: Option[Control]) {
 
   private[this] def received(p: Packet): Unit = p match {
     case PlayMessage(_play) =>
-      play = _play
-      status = Playing
-      playSync.synchronized(playSync.notify())
+      playSync.synchronized {
+        play = _play
+        status = Playing
+        playSync.notify()
+      }
 
     case osc.Message("/status") =>
       sendStatus()
@@ -68,6 +73,10 @@ final class Player(config: Config, control: Option[Control]) {
       import sys.process._
       val result = Try(cmdS.!!).toOption.getOrElse("ERROR")
       client ! osc.Message("/shell_reply", result)
+
+    case osc.Message("/shutdown") =>
+      log("shutting down...")
+      Main.shutdown()
 
     case _ =>
       Console.err.println(s"Unknown OSC message $p from control")
@@ -85,15 +94,29 @@ final class Player(config: Config, control: Option[Control]) {
   private[this] lazy val conFadeThread: Thread = new Thread {
     override def run(): Unit = {
       // ---- first stage: connect ----
+      Thread.sleep(10000)
 
-      while (!client.isConnected) try {
+      while (client == null || !client.isConnected || !client.isOpen()) try {
         log("Trying to connect to server...")
+        if (client == null || !client.isOpen()) client = mkClient()
         client.connect()
-        log("Client connected.")
         sendStatus()
+        Thread.sleep(4000)
       } catch {
-        case NonFatal(_) =>
-          Thread.sleep(1000)
+        case NonFatal(ex) =>
+          if (client != null) {
+            try {
+              client.close()
+            } catch {
+              case NonFatal(_) =>
+            }
+            client = null
+          }
+          Thread.sleep(4000)
+      }
+      log("Client connected.")
+      if (config.dumpOSC) {
+        client.dump()
       }
 
       val logNone   = ProcessLogger((_: String) => ())
@@ -101,11 +124,20 @@ final class Player(config: Config, control: Option[Control]) {
 
       // ---- second stage: play videos ----
       while (true) {
-        playSync.synchronized {
-          playSync.wait()
+        val pl = playSync.synchronized {
+          if (play == null) {
+            playSync.wait()
+          }
+          val res = play
+          play = null
+          res
         }
 
-        val pl = play
+        log(s"player - $pl")
+        if (pl.delay > 0) {
+          Thread.sleep((pl.delay * 1000).toLong)
+        }
+
         // Play(file: String, start: Float, duration: Float, orientation: Int, fadeIn: Float, fadeOut: Float)
         val cmdB = List.newBuilder[String]
         cmdB += "omxplayer"
@@ -143,6 +175,7 @@ final class Player(config: Config, control: Option[Control]) {
           launched = res == 0
           if (!launched) Thread.sleep(0)
         }
+        log(s"player - omx launched")
 
         if (pl.fadeIn > 0) {
           fadeIn(pl.fadeIn)
@@ -155,8 +188,11 @@ final class Player(config: Config, control: Option[Control]) {
         if (pl.fadeOut > 0) {
           fadeOut(pl.fadeOut)
         }
+        log(s"player - stopping omx")
         stopVideo()
         omx.exitValue() // wait for process to terminate
+        log(s"player - omx stopped")
+        Thread.sleep(1000)  // XXX TODO --- does this help with dbus registry?
 
         // signalise to control
         status = Idle
@@ -172,10 +208,43 @@ final class Player(config: Config, control: Option[Control]) {
     })
   }
 
+  @volatile
+  private[this] var debugMessage = ""
+
+  private def debugThreads(): Unit = {
+    import scala.collection.JavaConverters._
+    val m = Thread.getAllStackTraces.asScala.toVector.sortBy(_._1.getId)
+    println("Id__ State_________ Name___________________ Pri")
+    m.foreach { case (t, _) =>
+      println(f"${t.getId}%3d  ${t.getState}%-13s  ${t.getName}%-23s  ${t.getPriority}%2d")
+    }
+    m.foreach { case (t, stack) =>
+      println()
+      println(f"${t.getId}%3d  ${t.getState}%-13s  ${t.getName}%-23s")
+      if (t == Thread.currentThread()) println("    (self)")
+      else stack.foreach { elem =>
+        println(s"    $elem")
+      }
+    }
+  }
+
   private def openBlackWindow(): Unit = {
     val screen      = GraphicsEnvironment.getLocalGraphicsEnvironment.getDefaultScreenDevice
     val screenConf  = screen.getDefaultConfiguration
-    val w = new Frame(null, screenConf)
+    val fnt         = new Font(Font.SANS_SERIF, Font.BOLD, 36)
+    val w = new Frame(null, screenConf) {
+      override def paint(g: Graphics): Unit = {
+        super.paint(g)
+        val m = debugMessage
+        if (!m.isEmpty) {
+          g.setFont(fnt)
+          val fm = g.getFontMetrics
+          val tw = fm.stringWidth(debugMessage)
+          g.setColor(Color.white)
+          g.drawString(m, (getWidth - tw)/2, getHeight/2 - fm.getAscent)
+        }
+      }
+    }
     w.setUndecorated  (true)
 //    w.setIgnoreRepaint(true)
     w.setBackground(Color.black)
@@ -184,7 +253,11 @@ final class Player(config: Config, control: Option[Control]) {
         e.getKeyCode match {
           case KeyEvent.VK_ESCAPE => control.foreach(_.quit())
 //          case KeyEvent.VK_R      => drawRect = !drawRect // ; w.repaint()
-//          case KeyEvent.VK_T      => drawText = !drawText
+          case KeyEvent.VK_T      =>
+            debugMessage = play.toString
+            w.repaint()
+            debugThreads()
+
 //          case KeyEvent.VK_A      => animate  = !animate
 //          case KeyEvent.VK_C      => controlWindow.open()
 

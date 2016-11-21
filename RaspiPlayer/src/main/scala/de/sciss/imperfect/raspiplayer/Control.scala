@@ -52,6 +52,10 @@ final class Control(config: Config) {
   def start(): Unit = {
     receiver   .connect()
     transmitter.connect()
+    if (config.dumpOSC) {
+      receiver   .dump()
+      transmitter.dump()
+    }
   }
 
   def quit(): Unit = {
@@ -89,13 +93,14 @@ final class Control(config: Config) {
       case 1 => "notebook/notebook%d.mp4"
       case 2 => "precious/precious%daf.mp4"
     }
+    log(s"spawnVideo - vidFmt $vidFmt; ids ${vidIds.mkString(", ")}")
 
     j = 0
     while (j < clients.length) {
       if (clientStatus(j) != Unknown) {
         val vidId = vidIds(j % vidIds.size)
         val vid   = vidFmt.format(vidId)
-        val cmd   = Play(file = vid, start = 0f, duration = 30f, orientation = 0, fadeIn = 4f, fadeOut = 4f)
+        val cmd   = Play(file = vid, delay = 0f, start = 0f, duration = 30f, orientation = 0, fadeIn = 4f, fadeOut = 4f)
         try {
           transmitter.send(cmd, clients(j))
         } catch {
@@ -125,6 +130,7 @@ final class Control(config: Config) {
       p match {
         case osc.Message("/status", statusId: String) =>
           val status = Status(statusId)
+          log(s"client[$clientIdx] = $status")
           clientStatus(clientIdx) = status
           if (/* !clientsReady && */ clientStatus.count(_ == Idle) == numClientsC) {
             if (isFirstReady) {

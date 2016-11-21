@@ -50,8 +50,18 @@ object Main {
       opt[Unit] ("small")
         .text (s"Small display for debugging (default ${default.small})")
         .action   { (v, c) => c.copy(small = true) }
+
+      opt[Unit] ("keep-energy")
+        .text ("Do not turn off energy saving")
+        .action   { (v, c) => c.copy(disableEnergySaving = false) }
     }
     p.parse(args, default).fold(sys.exit(1)) { config =>
+      if (config.disableEnergySaving) {
+        import sys.process._
+        Seq("xset", "s", "off").!
+        Seq("xset", "-dpms").!
+      }
+
       val controlOpt = if (!config.isControl) None else {
         log("Creating control")
         val ctl = new Control(config)
