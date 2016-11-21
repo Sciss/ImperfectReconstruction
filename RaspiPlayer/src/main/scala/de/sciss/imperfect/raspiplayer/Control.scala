@@ -84,13 +84,18 @@ final class Control(config: Config) {
     }
 
     val vidIds: Vec[Int] = random.shuffle[Int, Vec](1 to 8)
+    val vidFmt = random.nextInt(3) match {
+      case 0 => "site/site%d.mp4"
+      case 1 => "notebook/notebook%d.mp4"
+      case 2 => "precious/precious%daf.mp4"
+    }
 
     j = 0
     while (j < clients.length) {
       if (clientStatus(j) != Unknown) {
         val vidId = vidIds(j % vidIds.size)
-        val vid   = s"site/site$vidId.mp4"
-        val cmd = Play(file = vid, start = 0f, duration = 30f, orientation = 0, fadeIn = 4f, fadeOut = 4f)
+        val vid   = vidFmt.format(vidId)
+        val cmd   = Play(file = vid, start = 0f, duration = 30f, orientation = 0, fadeIn = 4f, fadeOut = 4f)
         try {
           transmitter.send(cmd, clients(j))
         } catch {

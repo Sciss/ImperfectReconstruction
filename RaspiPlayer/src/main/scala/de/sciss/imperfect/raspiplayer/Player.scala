@@ -14,7 +14,7 @@
 package de.sciss.imperfect.raspiplayer
 
 import java.awt.event.{KeyAdapter, KeyEvent}
-import java.awt.{EventQueue, Frame, GraphicsEnvironment, Point}
+import java.awt.{Color, EventQueue, Frame, GraphicsEnvironment, Point}
 import java.awt.image.BufferedImage
 import java.net.InetSocketAddress
 
@@ -22,6 +22,7 @@ import de.sciss.file._
 import de.sciss.osc
 import de.sciss.osc.{Packet, UDP}
 
+import scala.sys.process.ProcessLogger
 import scala.util.Try
 import scala.util.control.NonFatal
 
@@ -95,6 +96,9 @@ final class Player(config: Config, control: Option[Control]) {
           Thread.sleep(1000)
       }
 
+      val logNone   = ProcessLogger((_: String) => ())
+      val logErrors = ProcessLogger((_: String) => (), (s: String) => Console.err.println(s))
+
       // ---- second stage: play videos ----
       while (true) {
         playSync.synchronized {
@@ -126,7 +130,7 @@ final class Player(config: Config, control: Option[Control]) {
 
         val cmd = cmdB.result()
         import sys.process._
-        val omx = cmd.run()
+        val omx = cmd.run(logErrors)
         val t1  = System.currentTimeMillis()
 
         // it takes a moment till the dbus client is registered.
@@ -135,7 +139,7 @@ final class Player(config: Config, control: Option[Control]) {
         // visible, and zero when it's there.
         var launched = false
         while (!launched && (System.currentTimeMillis() - t1 < 2000)) {
-          val res = Seq(script.path, "status").!
+          val res = Seq(script.path, "status").!<(logNone)
           launched = res == 0
           if (!launched) Thread.sleep(0)
         }
@@ -171,11 +175,11 @@ final class Player(config: Config, control: Option[Control]) {
   private def openBlackWindow(): Unit = {
     val screen      = GraphicsEnvironment.getLocalGraphicsEnvironment.getDefaultScreenDevice
     val screenConf  = screen.getDefaultConfiguration
-    val w = new Frame(null, screenConf) {
-      setUndecorated  (true)
-    }
+    val w = new Frame(null, screenConf)
+    w.setUndecorated  (true)
+//    w.setIgnoreRepaint(true)
+    w.setBackground(Color.black)
     w.addKeyListener(new KeyAdapter {
-      override def keyTyped  (e: KeyEvent): Unit = ()
       override def keyPressed(e: KeyEvent): Unit = {
         e.getKeyCode match {
           case KeyEvent.VK_ESCAPE => control.foreach(_.quit())
