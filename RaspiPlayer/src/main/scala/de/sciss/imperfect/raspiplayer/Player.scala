@@ -46,8 +46,9 @@ final class Player(config: Config, control: Option[Control]) {
   @volatile
   private[this] var client: UDP.Client = _
 
-  private[this] val script = config.baseDir/"dbuscontrol.sh"
-  require(script.canExecute, "dbuscontrol.sh script is not executable!")
+//  private[this] val script = config.baseDir/"dbuscontrol.sh"
+  private[this] val script = config.baseDir/"imperfect_dbus.sh"
+  require(script.canExecute, s"${script.name}  - script is not executable!")
 
   private def sendStatus(): Unit = client ! osc.Message("/status", status.id)
 
@@ -62,10 +63,6 @@ final class Player(config: Config, control: Option[Control]) {
     case osc.Message("/status") =>
       sendStatus()
 
-//    case osc.Message("/test") =>
-//      import sys.process._
-//      Seq("omxplayer", "--loop", config.testVideo.path).run()
-
     case osc.Message("/shell", cmd @ _*) =>
       val cmdS = cmd.map(_.toString)
       println("Executing shell command:")
@@ -74,9 +71,20 @@ final class Player(config: Config, control: Option[Control]) {
       val result = Try(cmdS.!!).toOption.getOrElse("ERROR")
       client ! osc.Message("/shell_reply", result)
 
+    case osc.Message("/color", i: Int) =>
+      if (window.isDefined) EventQueue.invokeLater(new Runnable {
+        def run(): Unit = {
+          window.foreach(_.setBackground(new Color(i)))
+        }
+      })
+
     case osc.Message("/shutdown") =>
       log("shutting down...")
       Main.shutdown()
+
+    case osc.Message("/reboot") =>
+      log("rebooting...")
+      Main.reboot()
 
     case _ =>
       Console.err.println(s"Unknown OSC message $p from control")
@@ -89,6 +97,23 @@ final class Player(config: Config, control: Option[Control]) {
     val minM = min % 60
     val hour = min / 60
     f"$hour%02d:$minM%02d:$secM%02d"
+  }
+
+  private[this] val logNone     = ProcessLogger((_: String) => ())
+  private[this] val logErrors   = ProcessLogger((_: String) => (), (s: String) => Console.err.println(s))
+  private[this] val hasDbusName = !config.dbusName.isEmpty
+  private[this] val dbusIsInc   = config.dbusName.contains("%d")
+  private[this] var dbusCount   = 0
+
+  private def mkDbusName(inc: Boolean = false): String = {
+    if (dbusIsInc) {
+      if (inc) dbusCount += 1
+      config.dbusName.format(dbusCount)
+    } else if (hasDbusName) {
+      config.dbusName
+    } else {
+      "org.mpris.MediaPlayer2.omxplayer"
+    }
   }
 
   private[this] lazy val conFadeThread: Thread = new Thread {
@@ -119,18 +144,15 @@ final class Player(config: Config, control: Option[Control]) {
         client.dump()
       }
 
-      val logNone   = ProcessLogger((_: String) => ())
-      val logErrors = ProcessLogger((_: String) => (), (s: String) => Console.err.println(s))
-
       // ---- second stage: play videos ----
       while (true) {
         val pl = playSync.synchronized {
           if (play == null) {
             playSync.wait()
           }
-          val res = play
-          play = null
-          res
+          /* val res = */ play
+          // play = null
+          // res
         }
 
         log(s"player - $pl")
@@ -140,8 +162,14 @@ final class Player(config: Config, control: Option[Control]) {
 
         // Play(file: String, start: Float, duration: Float, orientation: Int, fadeIn: Float, fadeOut: Float)
         val cmdB = List.newBuilder[String]
+//        cmdB += "sudo"
         cmdB += "omxplayer"
+        if (hasDbusName) {
+          cmdB += "--dbus_name"
+          cmdB += mkDbusName(inc = true)
+        }
         cmdB += "--no-osd"
+//        cmdB += "-b"
         if (pl.orientation != 0) {
           cmdB += "--orientation"
           cmdB += pl.orientation.toString
@@ -161,6 +189,7 @@ final class Player(config: Config, control: Option[Control]) {
         cmdB += (config.baseDir/"videos"/pl.file).path
 
         val cmd = cmdB.result()
+        log(cmd.mkString(" "))
         import sys.process._
         val omx = cmd.run(logErrors)
         val t1  = System.currentTimeMillis()
@@ -171,7 +200,7 @@ final class Player(config: Config, control: Option[Control]) {
         // visible, and zero when it's there.
         var launched = false
         while (!launched && (System.currentTimeMillis() - t1 < 2000)) {
-          val res = Seq(script.path, "status").!<(logNone)
+          val res = runScript("status" :: Nil, ignoreError = true)
           launched = res == 0
           if (!launched) Thread.sleep(0)
         }
@@ -200,6 +229,9 @@ final class Player(config: Config, control: Option[Control]) {
       }
     }
   }
+
+  @volatile
+  private[this] var window = Option.empty[Frame]
 
   def start(): Unit = {
     conFadeThread.start()
@@ -247,11 +279,12 @@ final class Player(config: Config, control: Option[Control]) {
     }
     w.setUndecorated  (true)
 //    w.setIgnoreRepaint(true)
-    w.setBackground(Color.black)
+    w.setBackground(new Color(config.background))
     w.addKeyListener(new KeyAdapter {
       override def keyPressed(e: KeyEvent): Unit = {
         e.getKeyCode match {
           case KeyEvent.VK_ESCAPE => control.foreach(_.quit())
+          case KeyEvent.VK_Q      => sys.exit()  // 'tschack!
 //          case KeyEvent.VK_R      => drawRect = !drawRect // ; w.repaint()
           case KeyEvent.VK_T      =>
             debugMessage = play.toString
@@ -273,12 +306,12 @@ final class Player(config: Config, control: Option[Control]) {
     val cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)
     val cursor = w.getToolkit.createCustomCursor(cursorImg, new Point(0, 0), "blank")
     w.setCursor(cursor)
+    window = Some(w)
   }
 
   private def setAlpha(i: Int): Int = {
     val alpha = math.max(0, math.min(255, i))
-    import sys.process._
-    Seq(script.path, "setalpha", alpha.toString).!
+    runScript("setalpha" :: alpha.toString :: Nil)
   }
 
   private def fade(from: Float, to: Float, dur: Float): Unit = {
@@ -310,8 +343,15 @@ final class Player(config: Config, control: Option[Control]) {
   private def fadeIn (dur: Float): Unit = fade(from = 0f, to = 1f, dur = dur)
   private def fadeOut(dur: Float): Unit = fade(from = 1f, to = 0f, dur = dur)
 
-  private def stopVideo(): Unit = {
+  private def runScript(args: List[String], ignoreError: Boolean = false): Int = {
     import sys.process._
-    Seq(script.path, "stop").!
+//    val name = mkDbusName()
+//    val pb = Process(script.path :: args, None, "OMXPLAYER_DBUS_NAME" -> name)
+//    val pb = Process("sudo" :: script.path :: args, None, "OMXPLAYER_DBUS_NAME" -> name)
+    val pb = script.path :: args
+    val res = if (ignoreError) pb.!<(logNone) else pb.!
+    res
   }
+
+  private def stopVideo(): Unit = runScript("stop" :: Nil)
 }

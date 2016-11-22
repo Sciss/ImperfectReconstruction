@@ -54,6 +54,14 @@ object Main {
       opt[Unit] ("keep-energy")
         .text ("Do not turn off energy saving")
         .action   { (v, c) => c.copy(disableEnergySaving = false) }
+
+      opt[Int] ("background")
+        .text (s"Background color 0xRRGGBB (default ${default.background.toHexString})")
+        .action   { (v, c) => c.copy(background = v) }
+
+      opt[String] ("dbus")
+        .text (s"dbus name for omxplayer (default: ${default.dbusName})")
+        .action   { (v, c) => c.copy(dbusName = v) }
     }
     p.parse(args, default).fold(sys.exit(1)) { config =>
       if (config.disableEnergySaving) {
@@ -77,5 +85,10 @@ object Main {
   def shutdown(): Unit = {
     import sys.process._
     Seq("sudo", "shutdown", "now").run()
+  }
+
+  def reboot(): Unit = {
+    import sys.process._
+    Seq("sudo", "reboot", "now").run()
   }
 }

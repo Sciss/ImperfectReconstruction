@@ -91,4 +91,6 @@ object Config {
 final case class Config(isControl: Boolean, thisHost: String, clientPort: Int = 57120,
                         baseDir: File = userHome/"Documents"/"projects"/"Imperfect"/"inner_space",
                         numClients: Int = 8, dumpOSC: Boolean = false, small: Boolean = false,
-                        disableEnergySaving: Boolean = true)
+                        disableEnergySaving: Boolean = true,
+                        background: Int = 0xFF00000,
+                        dbusName: String = "" /* "de.sciss.imperfect.Player%d" */)
