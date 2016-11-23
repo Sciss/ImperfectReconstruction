@@ -150,7 +150,24 @@ final class Control(config: Config) {
       i += 1
     }
     if (clientIdx < 0) {
-      Console.err.println(s"Unknown client $addr")
+      p match {
+        case osc.Message("/forward", cmdM: String, args @ _*) =>
+          val cmd = osc.Message(cmdM, args: _*)
+          var j = 0
+          while (j < clients.length) {
+            try {
+              transmitter.send(cmd, clients(j))
+            } catch {
+              case NonFatal(ex) =>
+                ex.printStackTrace()
+                clientStatus(j) = Idle
+            }
+            j += 1
+          }
+
+        case _ =>
+          Console.err.println(s"Unknown client $addr")
+      }
     } else {
       p match {
         case osc.Message("/status", statusId: String) =>

@@ -2,7 +2,7 @@ import com.typesafe.sbt.packager.linux.LinuxPackageMapping
 
 lazy val baseName         = "Imperfect-RaspiPlayer"
 lazy val baseNameL        = baseName.toLowerCase
-lazy val projectVersion   = "0.1.0"
+lazy val projectVersion   = "0.1.1-SNAPSHOT"
 
 lazy val commonSettings = Seq(
   version             := projectVersion,

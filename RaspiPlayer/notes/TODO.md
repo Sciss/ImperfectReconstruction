@@ -9,3 +9,6 @@
     DirectedUDPReceiverImpl.scala:20
     ThreadedImpl.scala:38
 [x] pre-delay (black init) option for Play
+
+[ ] bottom screens: render variants of 'fragments' slightly zoomed out
+    (more margin)
