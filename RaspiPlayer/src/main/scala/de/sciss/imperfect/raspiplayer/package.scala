@@ -17,6 +17,8 @@ import java.net.InetSocketAddress
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
 
+import de.sciss.kollflitz.Vec
+
 import scala.annotation.elidable
 import scala.annotation.elidable._
 
@@ -30,4 +32,11 @@ package object raspiplayer {
 
   val ServerPort    = 57110
   val ServerAddress = new InetSocketAddress("192.168.0.11", ServerPort)
+
+  implicit final class MyIntOps(private val i: Int) extends AnyVal {
+    def minutes(sec: Int): Int = i * 60 + sec
+  }
+
+  final val IndicesIn: Vec[Int] = 0 until 8
+  final val OrientIn : Vec[Int] = Vector(0, 90, 180, 270)
 }

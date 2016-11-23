@@ -18,18 +18,17 @@ import java.net.{InetSocketAddress, SocketAddress}
 import de.sciss.osc
 import de.sciss.osc.{Packet, UDP}
 
-import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.util.Random
 import scala.util.control.NonFatal
 
 final class Control(config: Config) {
   import config._
 
-  private[this] val random  = new Random()
+  private[this] implicit val random: Random = new Random()
 
-  private[this] val clients = {
+  private[this] val clients: Array[InetSocketAddress] = {
     // /etc/dhcpcd.conf
-    val res = Array.tabulate[InetSocketAddress](8) { i =>
+    val res = Array.tabulate(8) { i =>
       new InetSocketAddress(s"192.168.0.${11 + i}", clientPort)
     }
     res
@@ -87,20 +86,23 @@ final class Control(config: Config) {
       j += 1
     }
 
-    val vidIds: Vec[Int] = random.shuffle[Int, Vec](1 to 8)
-    val vidFmt = random.nextInt(3) match {
-      case 0 => "site/site%d.mp4"
-      case 1 => "notebook/notebook%d.mp4"
-      case 2 => "precious/precious%daf.mp4"
-    }
-    log(s"spawnVideo - vidFmt $vidFmt; ids ${vidIds.mkString(", ")}")
+//    val vidIds: Vec[Int] = random.shuffle[Int, Vec](1 to 8)
+//    val vidFmt = random.nextInt(3) match {
+//      case 0 => "site/site%d.mp4"
+//      case 1 => "notebook/notebook%d.mp4"
+//      case 2 => "precious/precious%daf.mp4"
+//    }
+//    log(s"spawnVideo - vidFmt $vidFmt; ids ${vidIds.mkString(", ")}")
+
+    val set  = Util.choose(VideoSet.all)
+    val cmds = set.select()
 
     j = 0
     while (j < clients.length) {
       if (clientStatus(j) != Unknown) {
-        val vidId = vidIds(j % vidIds.size)
-        val vid   = vidFmt.format(vidId)
-        val cmd   = Play(file = vid, delay = 0f, start = 0f, duration = 30f, orientation = 0, fadeIn = 4f, fadeOut = 4f)
+        val cmd   = cmds(j % cmds.size)
+//        val vid   = vidFmt.format(vidId)
+//        val cmd   = Play(file = vid, delay = 0f, start = 0f, duration = 30f, orientation = 0, fadeIn = 4f, fadeOut = 4f)
         try {
           transmitter.send(cmd, clients(j))
         } catch {
