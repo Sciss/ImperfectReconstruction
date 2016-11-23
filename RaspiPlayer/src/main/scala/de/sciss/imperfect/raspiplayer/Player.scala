@@ -31,7 +31,10 @@ final class Player(config: Config, control: Option[Control]) {
   private[this] var status: Status = Idle
 
   @volatile
-  private[this] var play: Play = _
+  private[this] var playIssued: Play = _
+
+  @volatile
+  private[this] var playActive: Play = _
 
   private[this] val playSync = new AnyRef
 
@@ -46,8 +49,8 @@ final class Player(config: Config, control: Option[Control]) {
   @volatile
   private[this] var client: UDP.Client = _
 
-//  private[this] val script = config.baseDir/"dbuscontrol.sh"
-  private[this] val script = config.baseDir/"imperfect_dbus.sh"
+  private[this] val script = config.baseDir/"dbuscontrol.sh"
+//  private[this] val script = config.baseDir/"imperfect_dbus.sh"
   require(script.canExecute, s"${script.name}  - script is not executable!")
 
   private def sendStatus(): Unit = client ! osc.Message("/status", status.id)
@@ -55,7 +58,7 @@ final class Player(config: Config, control: Option[Control]) {
   private[this] def received(p: Packet): Unit = p match {
     case PlayMessage(_play) =>
       playSync.synchronized {
-        play = _play
+        playIssued = _play
         status = Playing
         playSync.notify()
       }
@@ -147,12 +150,13 @@ final class Player(config: Config, control: Option[Control]) {
       // ---- second stage: play videos ----
       while (true) {
         val pl = playSync.synchronized {
-          if (play == null) {
+          if (playIssued == null) {
             playSync.wait()
           }
-          /* val res = */ play
-          // play = null
-          // res
+          val res = playIssued
+          playActive  = res
+          playIssued  = null
+          res
         }
 
         log(s"player - $pl")
@@ -283,11 +287,11 @@ final class Player(config: Config, control: Option[Control]) {
     w.addKeyListener(new KeyAdapter {
       override def keyPressed(e: KeyEvent): Unit = {
         e.getKeyCode match {
-          case KeyEvent.VK_ESCAPE => control.foreach(_.quit())
+          case KeyEvent.VK_ESCAPE => control.foreach(_.shutdown())
           case KeyEvent.VK_Q      => sys.exit()  // 'tschack!
-//          case KeyEvent.VK_R      => drawRect = !drawRect // ; w.repaint()
+          case KeyEvent.VK_R      => control.foreach(_.reboot())
           case KeyEvent.VK_T      =>
-            debugMessage = play.toString
+            debugMessage = if (playActive == null) "null" else playActive.toString
             w.repaint()
             debugThreads()
 

@@ -57,11 +57,11 @@ final class Control(config: Config) {
     }
   }
 
-  def quit(): Unit = {
-    log("Quitting...")
+  def shutdown(): Unit = {
+    log("Issuing shutdown...")
     var j = 0
     val cmd = osc.Message("/shutdown")
-      while (j < clients.length) {
+    while (j < clients.length) {
       try {
         transmitter.send(cmd, clients(j))
       } catch {
@@ -71,6 +71,22 @@ final class Control(config: Config) {
       j += 1
     }
     Main.shutdown()
+  }
+
+  def reboot(): Unit = {
+    log("Issuing reboot...")
+    var j = 0
+    val cmd = osc.Message("/reboot")
+      while (j < clients.length) {
+      try {
+        transmitter.send(cmd, clients(j))
+      } catch {
+        case NonFatal(ex) =>
+          ex.printStackTrace()
+      }
+      j += 1
+    }
+    Main.reboot()
   }
 
   private[this] var urn = StrangeUrn(VideoSet.all.toSet)

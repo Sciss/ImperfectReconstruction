@@ -43,8 +43,8 @@ object VideoSetSite extends VideoSet {
       val file    = nameFmt.format(i + 1)
       val durIn   = durations(i)
       val dur     = math.min(durIn, durTotI)
-      val start   = if (durIn == dur    ) 0f else rrand(0.0, durIn   - dur  ).toFloat
-      val delay   = if (durIn == durTotI) 0f else rrand(0.0, durTotI - durIn).toFloat
+      val start   = if (durIn <= dur    ) 0f else rrand(0.0, durIn   - dur  ).toFloat
+      val delay   = if (durIn >= durTotI) 0f else rrand(0.0, durTotI - durIn).toFloat
       val fadeIn  = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
       val fadeOut = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
       val screen  = Screen(i)
