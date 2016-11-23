@@ -90,6 +90,7 @@ final class Control(config: Config) {
   }
 
   private[this] var urn = StrangeUrn(VideoSet.all.toSet)
+  private[this] var spawnCount = 0
 
   private def spawnVideo(): Unit = {
 //    clientsReady = true
@@ -109,9 +110,14 @@ final class Control(config: Config) {
 //      case 2 => "precious/precious%daf.mp4"
 //    }
 //    log(s"spawnVideo - vidFmt $vidFmt; ids ${vidIds.mkString(", ")}")
-
-    val (set, urnNew) = urn.choose()
-    urn = urnNew
+    spawnCount += 1
+    val set = if (spawnCount % 2 == 0) {
+      val (_set, urnNew) = urn.choose()
+      urn = urnNew
+      _set
+    } else {
+      VideoSetFragments
+    }
     val cmds = set.select()
 
     j = 0

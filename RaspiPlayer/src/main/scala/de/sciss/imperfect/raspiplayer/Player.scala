@@ -164,6 +164,11 @@ final class Player(config: Config, control: Option[Control]) {
           Thread.sleep((pl.delay * 1000).toLong)
         }
 
+        val videoF = config.baseDir/"videos"/pl.file
+        if (!videoF.isFile) {
+          println(s"WARNING: video file '$videoF' does not exist.")
+        }
+
         // Play(file: String, start: Float, duration: Float, orientation: Int, fadeIn: Float, fadeOut: Float)
         val cmdB = List.newBuilder[String]
 //        cmdB += "sudo"
@@ -190,7 +195,7 @@ final class Player(config: Config, control: Option[Control]) {
           cmdB += "--win"
           cmdB += "384,256,896,768"
         }
-        cmdB += (config.baseDir/"videos"/pl.file).path
+        cmdB += videoF.path
 
         val cmd = cmdB.result()
         log(cmd.mkString(" "))
