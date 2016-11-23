@@ -24,7 +24,7 @@ object VideoSetMoor extends VideoSet {
     6 minutes 14,
     6 minutes 14,
     6 minutes 35,
-    2 minutes 11, // XXX TODO
+    2 minutes 56, // XXX TODO
     7 minutes 41,
     7 minutes 41
   )

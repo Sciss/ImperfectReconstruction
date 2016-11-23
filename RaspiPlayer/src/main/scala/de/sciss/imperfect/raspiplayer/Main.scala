@@ -15,8 +15,20 @@ package de.sciss.imperfect.raspiplayer
 
 import de.sciss.file.File
 
+import scala.util.control.NonFatal
+
 object Main {
+  private def buildInfString(key: String): String = try {
+    val clazz = Class.forName("de.sciss.imperfect.raspiplayer.BuildInfo")
+    val m     = clazz.getMethod(key)
+    m.invoke(null).toString
+  } catch {
+    case NonFatal(e) => "?"
+  }
+
   def main(args: Array[String]): Unit = {
+    println(s"-- Imperfect Reconstruction v${buildInfString("version")}, built ${buildInfString("builtAtString")} --")
+
     val myIP    = Config.checkIP()
     val default = Config(thisHost = myIP, isControl = myIP == Config.controlIP)
 

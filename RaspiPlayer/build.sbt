@@ -2,7 +2,7 @@ import com.typesafe.sbt.packager.linux.LinuxPackageMapping
 
 lazy val baseName         = "Imperfect-RaspiPlayer"
 lazy val baseNameL        = baseName.toLowerCase
-lazy val projectVersion   = "0.1.0-SNAPSHOT"
+lazy val projectVersion   = "0.1.0"
 
 lazy val commonSettings = Seq(
   version             := projectVersion,
@@ -20,12 +20,20 @@ lazy val commonSettings = Seq(
     "de.sciss"               %% "scalaosc"     % "1.1.5",
     "com.github.scopt"       %% "scopt"        % "3.5.0"
   ),
-  target in assembly := baseDirectory.value
+  target in assembly := baseDirectory.value,
+  // ---- build info ----
+  buildInfoPackage := "de.sciss.imperfect.raspiplayer",
+  buildInfoKeys := Seq(name, organization, version, scalaVersion, description,
+    BuildInfoKey.map(homepage) { case (k, opt)           => k -> opt.get },
+    BuildInfoKey.map(licenses) { case (_, Seq((lic, _))) => "license" -> lic }
+  ),
+  buildInfoOptions += BuildInfoOption.BuildTime
 )
 
 lazy val gpl2 = "GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt")
 
 lazy val root = Project(id = baseNameL, base = file("."))
+  .enablePlugins(BuildInfoPlugin)
   .settings(commonSettings)
 
 // -------------

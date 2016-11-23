@@ -47,8 +47,12 @@ object VideoSetSite extends VideoSet {
       val delay   = if (durIn >= durTotI) 0f else rrand(0.0, durTotI - durIn).toFloat
       val fadeIn  = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
       val fadeOut = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
+
       val screen  = Screen(screenIdx)
       val orient  = choose(screen.orientations)
+
+//      println(s"screenIdx $screenIdx, vidIdx $vidIdx, hanging? ${screen.isHanging}, orientations: ${screen.orientations}")
+
       Play(file = file, delay = delay, start = start, duration = dur, fadeIn = fadeIn, fadeOut = fadeOut,
         orientation = orient)
     }
