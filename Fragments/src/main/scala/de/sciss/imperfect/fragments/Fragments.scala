@@ -93,18 +93,24 @@ object Fragments {
     val top       = 32
     val left      = 36
     val right     = 32
+    val fps       = 25
+    val dur       = 18
+    val numFrames = fps * dur
 //    val bottom    = 32
     val colrBack  = Color.red
     val colrFront = Color.black
+
+    val baseDir   = userHome / "Documents" / "projects" / "Imperfect" / "Fragments"
+    val dirSlides = baseDir / "slides"
+    val dirFrames = baseDir / "frames"
+    val nameSlide = "fragment-%d.png"
+    val videoBase = userHome / "Documents" / "projects" / "Imperfect" / "inner_space" / "videos" / "fragments"
 
     val img       = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
     val g         = img.createGraphics()
     g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
     val fontD     = font.deriveFont(fontSize)
     g.setFont(fontD)
-
-    val dirOut    = userHome / "Documents" / "projects" / "Imperfect" / "Fragments" / "slides"
-    val nameOut   = "fragment-%d.png"
 
     lines /* .take(2) */.zipWithIndex.foreach { case (line, idx) =>
 
@@ -129,14 +135,35 @@ object Fragments {
         y
       }
 
-      val y1 = attempt(0)
-      val dh = h - y1
-      val y2 = dh * 0.5f
-      if (y2 < top) println(s"WARNING: got a top position of $y2 < $top")
-      attempt(dh * 0.5f)
+      val fOutSlide = dirSlides / nameSlide.format(idx + 1)
+      if (!fOutSlide.exists()) {
+        val y1 = attempt(0)
+        val dh = h - y1
+        val y2 = dh * 0.5f
+        if (y2 < top) println(s"WARNING: got a top position of $y2 < $top")
+        attempt(dh * 0.5f)
 
-      val fOut = dirOut / nameOut.format(idx + 1)
-      ImageIO.write(img, "png", fOut)
+        ImageIO.write(img, "png", fOutSlide)
+      }
+
+      val dirFrame = dirFrames / s"fragment-${idx + 1}"
+      dirFrame.mkdirs()
+      if (dirFrame.children(_.ext == "png").isEmpty) {
+        import sys.process._
+        for (frame <- 1 to numFrames) {
+          val fFrame = dirFrame / "frame-%d.png".format(frame)
+          val cmd = Seq("ln", "-s", fOutSlide.path, fFrame.path)
+          cmd.!
+        }
+      }
+
+      val videoF = videoBase / s"fragment-${idx + 1}.mp4"
+      if (!videoF.exists) {
+        import sys.process._
+        val cmd = Seq("ffmpeg", "-i", (dirFrame / "frame-%d.png").path, "-pix_fmt", "yuv420p",
+          "-r", "25", "-crf", "25", videoF.path)
+        cmd.!
+      }
     }
   }
 }
