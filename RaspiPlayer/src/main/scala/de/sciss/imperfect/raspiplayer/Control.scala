@@ -73,7 +73,7 @@ final class Control(config: Config) {
     Main.shutdown()
   }
 
-//  private[this] var clientsReady = false
+  private[this] var urn = StrangeUrn(VideoSet.all.toSet)
 
   private def spawnVideo(): Unit = {
 //    clientsReady = true
@@ -94,7 +94,8 @@ final class Control(config: Config) {
 //    }
 //    log(s"spawnVideo - vidFmt $vidFmt; ids ${vidIds.mkString(", ")}")
 
-    val set  = Util.choose(VideoSet.all)
+    val (set, urnNew) = urn.choose()
+    urn = urnNew
     val cmds = set.select()
 
     j = 0

@@ -13,8 +13,6 @@
 
 package de.sciss.imperfect.raspiplayer
 
-import de.sciss.kollflitz.Vec
-
 import scala.util.Random
 
 object Util {
@@ -39,7 +37,7 @@ object Util {
   /** `0` until `d` (exclusive). */
   def rand(d: Double)(implicit random: Random): Double  = random.nextDouble() * d
 
-  def coin(w: Double)(implicit random: Random): Boolean = random.nextDouble() < w
+  def coin(w: Double = 0.5)(implicit random: Random): Boolean = random.nextDouble() < w
 
   def choose[A](seq: Seq[A])(implicit random: Random): A =
     seq(random.nextInt(seq.size))
