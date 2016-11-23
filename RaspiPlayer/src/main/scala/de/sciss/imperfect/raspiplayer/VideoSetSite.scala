@@ -39,15 +39,15 @@ object VideoSetSite extends VideoSet {
 
     val durTotI: Int = rrand(minDur, maxDur)
     val indices   = random.shuffle(IndicesIn)
-    val cmd       = indices.map { i =>
-      val file    = nameFmt.format(i + 1)
-      val durIn   = durations(i)
+    val cmd       = indices.zipWithIndex.map { case (vidIdx, screenIdx) =>
+      val file    = nameFmt.format(vidIdx + 1)
+      val durIn   = durations(vidIdx)
       val dur     = math.min(durIn, durTotI)
       val start   = if (durIn <= dur    ) 0f else rrand(0.0, durIn   - dur  ).toFloat
       val delay   = if (durIn >= durTotI) 0f else rrand(0.0, durTotI - durIn).toFloat
       val fadeIn  = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
       val fadeOut = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
-      val screen  = Screen(i)
+      val screen  = Screen(screenIdx)
       val orient  = choose(screen.orientations)
       Play(file = file, delay = delay, start = start, duration = dur, fadeIn = fadeIn, fadeOut = fadeOut,
         orientation = orient)

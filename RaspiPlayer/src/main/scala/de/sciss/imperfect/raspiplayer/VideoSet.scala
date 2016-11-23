@@ -18,7 +18,8 @@ import de.sciss.kollflitz.Vec
 import scala.util.Random
 
 object VideoSet {
-  final val all: Vec[VideoSet] = Vector(VideoSetSite, VideoSetNotebook, VideoSetPrecious)
+  /** All but 'fragments'. */
+  final val all: Vec[VideoSet] = Vector(VideoSetSite, VideoSetNotebook, VideoSetPrecious, VideoSetMoor)
 }
 trait VideoSet {
   def select()(implicit random: Random): Vec[Play]

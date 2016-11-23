@@ -1,5 +1,5 @@
 /*
- *  VideoSetNotebook.scala
+ *  VideoSetMoor.scala
  *  (Imperfect Reconstruction)
  *
  *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
@@ -17,31 +17,33 @@ import de.sciss.kollflitz.Vec
 
 import scala.util.Random
 
-object VideoSetNotebook extends VideoSet {
+object VideoSetMoor extends VideoSet {
   private[this] final val durations = Vector[Int](
-    4 minutes 11,
-    4 minutes 23,
-    4 minutes  7,
-    4 minutes 12,
-    4 minutes 11,
-    4 minutes 19,
-    4 minutes  7,
-    4 minutes 49
+    4 minutes  9,
+    4 minutes  9,
+    6 minutes 14,
+    6 minutes 14,
+    6 minutes 35,
+    2 minutes 11, // XXX TODO
+    7 minutes 41,
+    7 minutes 41
   )
 
   private[this] final val minDur: Int = durations.min
   private[this] final val maxDur: Int = durations.max
 
-  private[this] final val nameFmt = "notebook/notebook%d.mp4"
+  private[this] final val nameFmt = "moor/moor%d%s.mp4"
 
   def select()(implicit random: Random): Vec[Play] = {
     import Util._
 
-    val durTotI: Int = maxDur // rrand(minDur, maxDur)
+    val durTotI: Int = math.min(4 minutes 9, rrand(minDur, maxDur))
     val indices   = random.shuffle(IndicesIn)
-    val cmd       = indices.zipWithIndex.map { case (vidIdx, screenIdx) =>
-      val file    = nameFmt.format(vidIdx + 1)
-      val durIn   = durations(vidIdx)
+    val cmd       = indices.zipWithIndex.map { case (ext, screenIdx) =>
+      val vidIdx  = ext / 2
+      val vr      = if (ext % 2 == 0) "a" else "b"
+      val file    = nameFmt.format(vidIdx + 1, vr)
+      val durIn   = durations(ext)
       val dur     = math.min(durIn, durTotI)
       val start   = if (durIn <= dur    ) 0f else rrand(0.0, durIn   - dur  ).toFloat
       val delay   = if (durIn >= durTotI) 0f else rrand(0.0, durTotI - durIn).toFloat
