@@ -95,16 +95,25 @@ object Fragments {
     val right     = 32
     val fps       = 25
     val dur       = 18
+    val smallerSz = 48
     val numFrames = fps * dur
 //    val bottom    = 32
     val colrBack  = Color.red
     val colrFront = Color.black
 
-    val baseDir   = userHome / "Documents" / "projects" / "Imperfect" / "Fragments"
-    val dirSlides = baseDir / "slides"
-    val dirFrames = baseDir / "frames"
-    val nameSlide = "fragment-%d.png"
-    val videoBase = userHome / "Documents" / "projects" / "Imperfect" / "inner_space" / "videos" / "fragments"
+    val baseDir     = userHome / "Documents" / "projects" / "Imperfect" / "Fragments"
+    val dirSlides   = baseDir / "slides"
+    val dirSlidesS  = baseDir / "slides-s"
+    val dirFrames   = baseDir / "frames"
+    val dirFramesS  = baseDir / "frames-s"
+    val nameSlide   = "fragment-%d.png"
+    val videoBase   = userHome / "Documents" / "projects" / "Imperfect" / "inner_space" / "videos" / "fragments"
+
+    dirSlides .mkdirs()
+    dirSlidesS.mkdirs()
+    dirFrames .mkdirs()
+    dirFramesS.mkdirs()
+    videoBase .mkdirs()
 
     val img       = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
     val g         = img.createGraphics()
@@ -114,56 +123,73 @@ object Fragments {
 
     lines /* .take(2) */.zipWithIndex.foreach { case (line, idx) =>
 
-      def attempt(y0: Float): Float = {
-        g.setColor(colrBack)
-        g.fillRect(0, 0, w, h)
-        g.setColor(colrFront)
-        val as = new AttributedString(line)
-        as.addAttribute(TextAttribute.FONT, fontD, 0, line.length)
-        val aci = as.getIterator
-        val frc = g.getFontRenderContext
-        val lbm = new LineBreakMeasurer(aci, frc)
+      def mkVariant(smaller: Boolean): Unit = {
+        def attempt(y0: Float): Float = {
+          g.setColor(colrBack)
+          g.fillRect(0, 0, w, h)
+          g.setColor(colrFront)
 
-        var y = y0
-        lbm.setPosition(0)
-        while (lbm.getPosition < line.length) {
-          val tl = lbm.nextLayout(w - left - right)
-          y += tl.getAscent
-          tl.draw(g, left, y)
-          y += tl.getDescent + tl.getLeading
+          val atOrig = g.getTransform
+          if (smaller) {
+            val scale = (w - smallerSz * 2).toDouble / w
+            g.translate(smallerSz, smallerSz)
+            g.scale(scale, scale)
+          }
+
+          val as = new AttributedString(line)
+          as.addAttribute(TextAttribute.FONT, fontD, 0, line.length)
+          val aci = as.getIterator
+          val frc = g.getFontRenderContext
+          val lbm = new LineBreakMeasurer(aci, frc)
+
+          var y = y0
+          lbm.setPosition(0)
+          while (lbm.getPosition < line.length) {
+            val tl = lbm.nextLayout(w - left - right)
+            y += tl.getAscent
+            tl.draw(g, left, y)
+            y += tl.getDescent + tl.getLeading
+          }
+
+          g.setTransform(atOrig)
+
+          y
         }
-        y
-      }
 
-      val fOutSlide = dirSlides / nameSlide.format(idx + 1)
-      if (!fOutSlide.exists()) {
-        val y1 = attempt(0)
-        val dh = h - y1
-        val y2 = dh * 0.5f
-        if (y2 < top) println(s"WARNING: got a top position of $y2 < $top")
-        attempt(dh * 0.5f)
+        val fOutSlide = (if (smaller) dirSlidesS else dirSlides) / nameSlide.format(idx + 1)
+        if (!fOutSlide.exists()) {
+          val y1 = attempt(0)
+          val dh = h - y1
+          val y2 = dh * 0.5f
+          if (y2 < top) println(s"WARNING: got a top position of $y2 < $top")
+          attempt(dh * 0.5f)
 
-        ImageIO.write(img, "png", fOutSlide)
-      }
+          ImageIO.write(img, "png", fOutSlide)
+        }
 
-      val dirFrame = dirFrames / s"fragment-${idx + 1}"
-      dirFrame.mkdirs()
-      if (dirFrame.children(_.ext == "png").isEmpty) {
-        import sys.process._
-        for (frame <- 1 to numFrames) {
-          val fFrame = dirFrame / "frame-%d.png".format(frame)
-          val cmd = Seq("ln", "-s", fOutSlide.path, fFrame.path)
+        val dirFrame = (if (smaller) dirFramesS else dirFrames) / s"fragment-${idx + 1}"
+        dirFrame.mkdirs()
+        if (dirFrame.children(_.ext == "png").isEmpty) {
+          import sys.process._
+          for (frame <- 1 to numFrames) {
+            val fFrame = dirFrame / "frame-%d.png".format(frame)
+            val cmd = Seq("ln", "-s", fOutSlide.path, fFrame.path)
+            cmd.!
+          }
+        }
+
+        val videoName = if (smaller) s"fragment-s-${idx + 1}.mp4" else s"fragment-${idx + 1}.mp4"
+        val videoF = videoBase / videoName
+        if (!videoF.exists) {
+          import sys.process._
+          val cmd = Seq("ffmpeg", "-i", (dirFrame / "frame-%d.png").path, "-pix_fmt", "yuv420p",
+            "-r", "25", "-crf", "25", videoF.path)
           cmd.!
         }
       }
 
-      val videoF = videoBase / s"fragment-${idx + 1}.mp4"
-      if (!videoF.exists) {
-        import sys.process._
-        val cmd = Seq("ffmpeg", "-i", (dirFrame / "frame-%d.png").path, "-pix_fmt", "yuv420p",
-          "-r", "25", "-crf", "25", videoF.path)
-        cmd.!
-      }
+      mkVariant(smaller = false)
+      mkVariant(smaller = true )
     }
   }
 }
