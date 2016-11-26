@@ -89,8 +89,12 @@ final class Control(config: Config) {
     Main.reboot()
   }
 
-  private[this] var urn = StrangeUrn(VideoSet.all.toSet)
-  private[this] var spawnCount = 0
+  private[this] var urnHH       = StrangeUrn(VideoSet       .all.toSet)
+  private[this] var urnDP       = StrangeUrn(VideoSetsRattle.all.toSet)
+  private[this] var isDP        = random.nextBoolean()
+  private[this] var streakToGo  = 0
+
+  private[this] var spawnCount  = 0
 
   private def spawnVideo(): Unit = {
 //    clientsReady = true
@@ -103,20 +107,26 @@ final class Control(config: Config) {
       j += 1
     }
 
-//    val vidIds: Vec[Int] = random.shuffle[Int, Vec](1 to 8)
-//    val vidFmt = random.nextInt(3) match {
-//      case 0 => "site/site%d.mp4"
-//      case 1 => "notebook/notebook%d.mp4"
-//      case 2 => "precious/precious%daf.mp4"
-//    }
-//    log(s"spawnVideo - vidFmt $vidFmt; ids ${vidIds.mkString(", ")}")
-    spawnCount += 1
-    val set = if (spawnCount % 2 == 0) {
-      val (_set, urnNew) = urn.choose()
-      urn = urnNew
-      _set
+    if (streakToGo == 0) {
+      isDP  = !isDP
+      streakToGo  = if (isDP) VideoSetsRattle.all.size else VideoSet.all.size
+    }
+    streakToGo -= 1
+
+    val set = if (isDP) {
+      val (_res, urnNew) = urnDP.choose()
+      urnDP = urnNew
+      _res
     } else {
-      VideoSetFragments
+      spawnCount += 1
+      val _set = if (spawnCount % 2 == 0) {
+        val (_res, urnNew) = urnHH.choose()
+        urnHH = urnNew
+        _res
+      } else {
+        VideoSetFragments
+      }
+      _set
     }
     val cmds = set.select()
 
