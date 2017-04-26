@@ -24,18 +24,19 @@ object CoverDiff {
     val gain          = 6.0
     val threshold     = 0.2
     val greenGain     = 1.2
-    val rotate        = 0
+    val rotate        = 180
     val autoLevels    = true
 
-//    val framesIn      = 5026
-//    val framesOut     = 500 + 1
-    val frameStep     = 10 // (framesIn - seqLen) / framesOut
+    val framesIn      = 5026
+    val framesOut     = 500 + 1
+//    val frameStep     = 10
+    val frameStep     = (framesIn - seqLen) / framesOut
 
     val baseDir = file("/") /"data" / "projects" / "Imperfect"
     val config = DifferenceProcess.Config(
       templateIn  = baseDir / "site-2" / "frame-%d.jpg",
       templateOut = baseDir / "catalog" / "cover" / "site-2out_catalog" / "frame-%d.jpg",
-      idxRange0   = 1300 to 3704, // 1 to framesIn,
+      idxRange0   = 1 to framesIn, // 1300 to 3704,
       width       = widthPixOut,
       height      = heightPixOut,
       trimLeft    = trimLeft,

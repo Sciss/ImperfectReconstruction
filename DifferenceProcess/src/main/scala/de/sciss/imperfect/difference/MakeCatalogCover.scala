@@ -26,25 +26,42 @@ object MakeCatalogCover {
 //  val baseDirExt: File = file("/media") / "hhrutz" / "AC6E5D6F6E5D3376" / "projects" / "Imperfect"
   val coverDir  : File = baseDirInt / "catalog" / "cover"
 
+  val mainDPI           : Int     = 198 // 200
+  val _davidDPI         : Int     = 115
+  val _sheetWidth       : Double  = 420.0
+  val _sheetHeight      : Double  = 215.0
+  val _sheetMarginLeft  : Double  = 3.5 // 6.0 // 7.5
+  val _sheetMarginRight : Double  = 3.5 // 6.0 // 7.5
+  val _sheetMarginTop   : Double  = 5.0
+  val _sheetWidthInner  : Double  = _sheetWidth - (_sheetMarginLeft + _sheetMarginRight)
+
+  implicit class NumOps(d: Double) {
+    def mmToInches: Double = d / 25.4
+  }
+
   case class Config(
                      davidDir   : File    = baseDirInt / "david" / "causality_report",
-                      hhDir     : File    = coverDir / "site-2out_catalog",
-//                     hhDir      : File    = baseDirExt / "site-2out_cover_final",
+                     hhDir      : File    = coverDir / "site-2out_catalog",
+                     hhExt      : String  = "jpg",
                      pngOutTemp : File    = coverDir / "front" / "front-%d.png",
                      pdfOutTemp : File    = coverDir / "front-pdf" / "front-%d.pdf",
-                     cropMarks  : File    = coverDir / "postcard-front-empty.pdf",
+                     cropMarks  : File    = coverDir / "cover_white.pdf",
                      strokeWidth: Double  = 2.0,
                      gamma      : Double  = 2.0,
-                     innerWidth : Int     = 816, // 826
-                     davidDPI   : Double  = 59,
-                     hhDPI      : Int     = 200,
+                     innerWidth : Int     = ((_sheetWidthInner/2).mmToInches * mainDPI).round.toInt & ~1,
+                     davidDPI   : Double  = _davidDPI,
+                     hhDPI      : Int     = mainDPI,
                      tag        : Boolean = true,
-                     tagWidth   : Int     = 5,
-                     tagHeight  : Int     = 15,
-                     tagMargin  : Int     = (6 / 25.4 * 200 + 0.5).toInt,
-                     renderPDF  : Boolean = false,
+                     tagWidth   : Int     = 6,
+                     tagHeight  : Int     = 18,
+                     tagMarginRight  : Int     = (8.0 / 25.4 * mainDPI + 0.5).toInt,
+                     tagMarginBottom : Int     = (6.5 / 25.4 * mainDPI + 0.5).toInt,
+                     renderPDF  : Boolean = true,
                      assembly   : Option[File] = None, // Some(coverDir / "front-all.pdf"),
-                     maxItems   : Int     = 10
+                     maxItems   : Int     = 4,
+                     sheetWidth : Double  = _sheetWidth,
+                     sheetHeight: Double  = _sheetHeight,
+                     sheetMarginTop: Double = _sheetMarginTop
                    )
 
   def main(args: Array[String]): Unit = {
@@ -52,7 +69,10 @@ object MakeCatalogCover {
   }
 
   implicit val fileNameOrdering = new Ordering[File] {
-    def compare(f1: File, f2: File): Int = compareName(f1.name, f2.name)
+    def compare(f1: File, f2: File): Int = {
+      compareName(f1.name, f2.name)
+//      foo.Foo.compareNames(f1.name, f2.name)
+    }
   }
 
   def applyTemplate(temp: File, idx: Int): File = {
@@ -72,15 +92,21 @@ object MakeCatalogCover {
     // then trunk 1 px left + right, 2 px top + bottom, then extend to
     // target height (850 == 108 mm at 200 dpi)
 
-    val davidIn0  = davidDir.children(_.ext == "svg").sorted
-    val hhIn0     = hhDir   .children(_.ext == "png").sorted
+    val davidIn0  = davidDir.children(_.ext == "svg").sorted[File]
+    val hhIn0     = hhDir   .children(_.ext == hhExt)
+//    println(s"size = ${hhIn0.size}")
+    val hhIn1     = hhIn0.sorted[File]
     val davidIn   = davidIn0 // .take(1)
-    val hhIn      = hhIn0    // .take(1)
+    val hhIn      = hhIn1    // .take(1)
     val compGamma = new MultiplyGammaComposite(gamma = gamma.toFloat)
     val compMul   = new MultiplyGammaComposite
 
     //    outTemp.parentOption.foreach(_.mkdirs())
     val zipped0   = davidIn zip hhIn
+    if (zipped0.isEmpty) {
+      println("Woops. No input files found.")
+    }
+
     val zipped    = if (maxItems > 0) zipped0.take(maxItems) else zipped0
 
     zipped.zipWithIndex.foreach { case ((svgIn, siteIn), frameIdx0) =>
@@ -150,10 +176,10 @@ object MakeCatalogCover {
           // g2.setClip(clipOrig)
           for (i <- 0 until 9) {
             val b   = ((frameIdx >>> i) & 1) == 1
-            val px1 = width - (tagWidth * 2 * (i + 1)) - tagMargin
+            val px1 = width - (tagWidth * 2 * (i + 1)) - tagMarginRight
             val px2 = px1 + tagWidth
             val ch  = if (b) tagHeight else tagHeight/3
-            val py1 = height - tagMargin - ch
+            val py1 = height - tagMarginBottom - ch
             val py2 = py1 + ch
             g2.drawImage(hhPng, px1, py1, px2, py2, px1, py1, px2, py2, null)
           }
@@ -178,19 +204,20 @@ object MakeCatalogCover {
         println(s"Rendering... '${pdfF.name}'")
 
         val tex =
-          s"""\\documentclass{article}
-             |\\usepackage[paperwidth=227mm,paperheight=117mm,top=0mm,left=0mm,bottom=0mm,right=0mm]{geometry}
+          f"""\\documentclass{article}
+             |\\usepackage[paperwidth=$sheetWidth%gmm,paperheight=$sheetHeight%gmm,top=0mm,left=0mm,bottom=0mm,right=0mm]{geometry}
              |\\usepackage{graphicx}
              |\\usepackage{background}
              |\\backgroundsetup{
              |scale=1,
              |angle=0,
-             |contents={\\includegraphics[width=\\paperwidth,height=\\paperheight]{${cropMarks.path}}}
-             |}
+             |contents={%%
+             |\\includegraphics[width=\\paperwidth,height=\\paperheight]{${cropMarks.path}}%%
+             |}}
              |\\begin{document}
              |\\thispagestyle{empty}
              |\\centering
-             |\\includegraphics[trim=0 0 0 -4.5mm]{${composedF.path}}
+             |\\includegraphics[trim=0 0 0 -$sheetMarginTop%gmm]{${composedF.path}}%%
              |\\end{document}
              |""".stripMargin
 
@@ -303,14 +330,17 @@ object MakeCatalogCover {
           i += 1
           c3 = if (i < n1) s1.charAt(i) else 'x'
           c4 = if (i < n2) s2.charAt(i) else 'x'
+          if (c1 == c2 && c3 != c4) {
+            c1 = c3
+            c2 = c4
+          }
           d1 = Character.isDigit(c3)
           d2 = Character.isDigit(c4)
         }
-        while (d1 && d2 && c3 == c4)
+        while (d1 && d2)
 
         if (d1 != d2) return if (d1) 1 else -1
         if (c1 != c2) return c1 - c2
-        if (c3 != c4) return c3 - c4
         i -= 1
 
       }
