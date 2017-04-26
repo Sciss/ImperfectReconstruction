@@ -2,7 +2,7 @@
  *  DifferenceProcess.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -14,8 +14,9 @@
 package de.sciss.imperfect.difference
 
 import de.sciss.file._
-import de.sciss.fscape.gui.SimpleGUI
 import de.sciss.fscape._
+import de.sciss.fscape.graph.ArithmSeq
+import de.sciss.fscape.gui.SimpleGUI
 import de.sciss.synth.io.AudioFileSpec
 import scopt.OptionParser
 
@@ -87,10 +88,15 @@ object DifferenceProcess {
   def run(config: Config): Unit = {
     import config._
 
+    if ((height & 1) != 0) {
+      println("Warning: DifferenceProcess has a bug when height is not an even number!")
+    }
+
     val SEQUENCE      = true
     val idxRange      = (if (SEQUENCE) idxRange0 else idxRange0.take(30)).map(x => x: GE)
     val numInput      = idxRange.size
-    val indices       = idxRange.reduce(_ ++ _)   // XXX TODO --- we need a better abstraction for this
+//    val indices       = idxRange.reduce(_ ++ _)
+    val indices       = ArithmSeq(start = idxRange.head, step = 1, length = idxRange.size)
     val widthIn       = 3280  // XXX TODO read from first input image!
     val heightIn      = 2464  // XXX TODO read from first input image!
 //    val width         = 1920
@@ -134,7 +140,7 @@ object DifferenceProcess {
       def blur(in: GE): GE = in // XXX TODO --- perhaps 2D-FFT-based convolution --- fltBlur.filter(in, null)
 
       // actually "negative delay"
-      def delayFrame(in: GE, n: Int = 1): GE = in.drop(frameSizeL * n)
+      def delayFrame(in: GE, n: Int): GE = in.drop(frameSizeL * n)
 
       def extractBrightness(in: GE): GE = {
         val r   = ChannelProxy(in, 0)
@@ -295,7 +301,8 @@ object DifferenceProcess {
           fileType = tpe,
           sampleFormat = ImageFile.SampleFormat.Int8, quality = 100
         )
-        val indicesOut  = idxRangeOut.map(x => x: GE).reduce(_ ++ _)
+//        val indicesOut  = idxRangeOut.map(x => x: GE).reduce(_ ++ _)
+        val indicesOut  = ArithmSeq(idxRangeOut.head, step = 1, length = idxRangeOut.size)
         ImageFileSeqOut(template = templateOut, spec = spec, in = sigOut, indices = indicesOut)
         Progress(Frames(sigOut) / (frameSizeL * idxRangeOut.size), Metro(frameSize))
 

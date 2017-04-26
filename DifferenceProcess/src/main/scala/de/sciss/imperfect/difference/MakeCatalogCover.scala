@@ -1,5 +1,5 @@
 /*
- *  MakePostcards.scala
+ *  MakeCatalogCover.scala
  *  (Imperfect Reconstruction)
  *
  *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
@@ -21,18 +21,18 @@ import javax.imageio.{IIOImage, ImageIO, ImageTypeSpecifier}
 
 import de.sciss.file._
 
-object MakePostcards {
-  val baseDirInt: File = userHome / "Documents" / "projects" / "Imperfect"
-  val baseDirExt: File = file("/media") / "hhrutz" / "AC6E5D6F6E5D3376" / "projects" / "Imperfect"
-  val flyerDir  : File = baseDirExt / "logistics" / "flyer"
+object MakeCatalogCover {
+  val baseDirInt: File = file("/") / "data" / "projects" / "Imperfect"
+//  val baseDirExt: File = file("/media") / "hhrutz" / "AC6E5D6F6E5D3376" / "projects" / "Imperfect"
+  val coverDir  : File = baseDirInt / "catalog" / "cover"
 
   case class Config(
                      davidDir   : File    = baseDirInt / "david" / "causality_report",
-                     // hhDir   : File    = baseDir / "site-2out_cover_final",
-                     hhDir      : File    = baseDirExt / "site-2out_cover_final",
-                     pngOutTemp : File    = flyerDir / "front" / "front-%d.png",
-                     pdfOutTemp : File    = flyerDir / "front-pdf" / "front-%d.pdf",
-                     cropMarks  : File    = flyerDir / "postcard-front-empty.pdf",
+                      hhDir     : File    = coverDir / "site-2out_catalog",
+//                     hhDir      : File    = baseDirExt / "site-2out_cover_final",
+                     pngOutTemp : File    = coverDir / "front" / "front-%d.png",
+                     pdfOutTemp : File    = coverDir / "front-pdf" / "front-%d.pdf",
+                     cropMarks  : File    = coverDir / "postcard-front-empty.pdf",
                      strokeWidth: Double  = 2.0,
                      gamma      : Double  = 2.0,
                      innerWidth : Int     = 816, // 826
@@ -42,9 +42,10 @@ object MakePostcards {
                      tagWidth   : Int     = 5,
                      tagHeight  : Int     = 15,
                      tagMargin  : Int     = (6 / 25.4 * 200 + 0.5).toInt,
-                     renderPDF  : Boolean = true,
-                     assembly   : Option[File] = Some(flyerDir / "front-all.pdf")
-                 )
+                     renderPDF  : Boolean = false,
+                     assembly   : Option[File] = None, // Some(coverDir / "front-all.pdf"),
+                     maxItems   : Int     = 10
+                   )
 
   def main(args: Array[String]): Unit = {
     run(Config())
@@ -78,8 +79,9 @@ object MakePostcards {
     val compGamma = new MultiplyGammaComposite(gamma = gamma.toFloat)
     val compMul   = new MultiplyGammaComposite
 
-//    outTemp.parentOption.foreach(_.mkdirs())
-    val zipped    = davidIn zip hhIn
+    //    outTemp.parentOption.foreach(_.mkdirs())
+    val zipped0   = davidIn zip hhIn
+    val zipped    = if (maxItems > 0) zipped0.take(maxItems) else zipped0
 
     zipped.zipWithIndex.foreach { case ((svgIn, siteIn), frameIdx0) =>
       val frameIdx  = frameIdx0 + 1
@@ -199,7 +201,7 @@ object MakePostcards {
         fOut.close()
         import sys.process._
         val cmdPDF = Seq("pdflatex", texF.name)
-//        println(texF)
+        //        println(texF)
         // run `pdflatex` twice, otherwise background crop marks do not appear
         Process(cmdPDF, texF.parent).!!
         Process(cmdPDF, texF.parent).!!
@@ -223,8 +225,8 @@ object MakePostcards {
 
         val inPaths = (1 to zipped.size).map(frameIdx => applyTemplate(pdfOutTemp, frameIdx).name)
         val wd      = pdfOutTemp.parent
-//        val cmdAss  = Seq("gs", "-sDEVICE=pdfwrite", "-dPDFSETTINGS=/printer", "-dNOPAUSE", "-dBATCH", "-dSAFER",
-//          s"-sOutputFile=${assemblyF.path}") ++ inPaths
+        //        val cmdAss  = Seq("gs", "-sDEVICE=pdfwrite", "-dPDFSETTINGS=/printer", "-dNOPAUSE", "-dBATCH", "-dSAFER",
+        //          s"-sOutputFile=${assemblyF.path}") ++ inPaths
 
         val cmdAss = "pdftk" +: inPaths :+ "cat" :+ "output" :+ assemblyF.path
 
@@ -277,7 +279,7 @@ object MakePostcards {
 
     metadata.mergeTree("javax_imageio_1.0", root)
   }
-  
+
   // compares strings insensitive to case but sensitive to integer numbers
   def compareName(s1: String, s2: String): Int = {
     // this is a quite ugly direct translation from a Java snippet I wrote,
