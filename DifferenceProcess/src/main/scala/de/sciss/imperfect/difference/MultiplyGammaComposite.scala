@@ -6,11 +6,14 @@ import java.awt.image.ColorModel
 import de.sciss.imperfect.difference.RGBComposite.RGBCompositeContext
 
 object MultiplyGammaComposite {
-  final class Context(alpha: Float, gamma: Float, srcColorModel: ColorModel, dstColorModel: ColorModel) 
+  final class Context(alpha: Float, gamma: Float, srcColorModel: ColorModel, dstColorModel: ColorModel,
+                     maxRed: Int, maxGreen: Int, maxBlue: Int)
     extends RGBCompositeContext(alpha, srcColorModel, dstColorModel) {
+
+    import math.{min, pow}
     
     def composeRGB(src: Array[Int], dst: Array[Int], alpha: Float): Unit = {
-      val w = math.min(src.length, dst.length)
+      val w = min(src.length, dst.length)
       var i = 0
       val p = 1.0f / gamma
       while (i < w) {
@@ -23,9 +26,9 @@ object MultiplyGammaComposite {
 //        val sa  = src(i + 3) / 255f
 //        val dia = dst(i + 3) / 255f
 
-        val dor = (math.pow(dir * sr, p) * 255f + 0.5).toInt
-        val dog = (math.pow(dig * sg, p) * 255f + 0.5).toInt
-        val dob = (math.pow(dib * sb, p) * 255f + 0.5).toInt
+        val dor = min(maxRed  , (pow(dir * sr, p) * 255f + 0.5).toInt)
+        val dog = min(maxGreen, (pow(dig * sg, p) * 255f + 0.5).toInt)
+        val dob = min(maxBlue , (pow(dib * sb, p) * 255f + 0.5).toInt)
 
 //        val a : Float = alpha * sa / 255f
 //        val ac: Float = 1 - a
@@ -45,7 +48,11 @@ object MultiplyGammaComposite {
   }
 }
 
-final class MultiplyGammaComposite(val alpha: Float = 1f, val gamma: Float = 1f) extends RGBComposite(alpha) {
+final class MultiplyGammaComposite(val alpha: Float = 1f, val gamma: Float = 1f,
+                                   maxRed: Int = 255, maxGreen: Int = 255, maxBlue: Int = 255)
+  extends RGBComposite(alpha) {
+
   def createContext(srcColorModel: ColorModel, dstColorModel: ColorModel, hints: RenderingHints): CompositeContext =
-    new MultiplyGammaComposite.Context(alpha, gamma, srcColorModel, dstColorModel)
+    new MultiplyGammaComposite.Context(alpha, gamma, srcColorModel, dstColorModel,
+      maxRed = maxRed, maxGreen = maxGreen, maxBlue = maxBlue)
 }

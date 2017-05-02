@@ -13,11 +13,12 @@
 
 package de.sciss.imperfect.difference
 
-import java.awt.Color
+import java.awt.{AlphaComposite, Color}
 import java.awt.image.BufferedImage
 import java.io.{FileInputStream, FileOutputStream}
 import javax.imageio.metadata.{IIOMetadata, IIOMetadataNode}
-import javax.imageio.{IIOImage, ImageIO, ImageTypeSpecifier}
+import javax.imageio.plugins.jpeg.JPEGImageWriteParam
+import javax.imageio.{IIOImage, ImageIO, ImageTypeSpecifier, ImageWriteParam}
 
 import de.sciss.file._
 
@@ -26,42 +27,50 @@ object MakeCatalogCover {
 //  val baseDirExt: File = file("/media") / "hhrutz" / "AC6E5D6F6E5D3376" / "projects" / "Imperfect"
   val coverDir  : File = baseDirInt / "catalog" / "cover"
 
-  val mainDPI           : Int     = 198 // 200
-  val _davidDPI         : Int     = 115
+  val mainDPI           : Int     = 200
+  val _davidDPI         : Int     = 116
   val _sheetWidth       : Double  = 420.0
   val _sheetHeight      : Double  = 215.0
-  val _sheetMarginLeft  : Double  = 3.5 // 6.0 // 7.5
-  val _sheetMarginRight : Double  = 3.5 // 6.0 // 7.5
-  val _sheetMarginTop   : Double  = 5.0
-  val _sheetWidthInner  : Double  = _sheetWidth - (_sheetMarginLeft + _sheetMarginRight)
+  val _sheetCutLeft     : Double  = 3.5 // 6.0 // 7.5
+  val _sheetCutRight    : Double  = 3.5 // 6.0 // 7.5
+  val _sheetInsetLeft   : Double  = 7.0
+  val _sheetInsetRight  : Double  = 7.0
+  val _sheetCutTop      : Double  = 3.5
+  val _sheetWidthInner  : Double  = _sheetWidth - (_sheetInsetLeft + _sheetInsetRight)
 
   implicit class NumOps(d: Double) {
     def mmToInches: Double = d / 25.4
   }
 
   case class Config(
-                     davidDir   : File    = baseDirInt / "david" / "causality_report",
-                     hhDir      : File    = coverDir / "site-2out_catalog",
-                     hhExt      : String  = "jpg",
-                     pngOutTemp : File    = coverDir / "front" / "front-%d.png",
-                     pdfOutTemp : File    = coverDir / "front-pdf" / "front-%d.pdf",
-                     cropMarks  : File    = coverDir / "cover_white.pdf",
-                     strokeWidth: Double  = 2.0,
-                     gamma      : Double  = 2.0,
-                     innerWidth : Int     = ((_sheetWidthInner/2).mmToInches * mainDPI).round.toInt & ~1,
-                     davidDPI   : Double  = _davidDPI,
-                     hhDPI      : Int     = mainDPI,
-                     tag        : Boolean = true,
-                     tagWidth   : Int     = 6,
-                     tagHeight  : Int     = 18,
-                     tagMarginRight  : Int     = (8.0 / 25.4 * mainDPI + 0.5).toInt,
-                     tagMarginBottom : Int     = (6.5 / 25.4 * mainDPI + 0.5).toInt,
-                     renderPDF  : Boolean = true,
-                     assembly   : Option[File] = None, // Some(coverDir / "front-all.pdf"),
-                     maxItems   : Int     = 4,
-                     sheetWidth : Double  = _sheetWidth,
-                     sheetHeight: Double  = _sheetHeight,
-                     sheetMarginTop: Double = _sheetMarginTop
+                     davidDir         : File    = baseDirInt / "david" / "causality_report",
+                     hhDir            : File    = coverDir / "site-2out_catalogSel",
+                     hhExt            : String  = "jpg",
+                     pngOutTemp       : File    = coverDir / "front" / "front-%d.jpg",
+                     pdfOutTemp       : File    = coverDir / "front-pdf" / "front-%d.pdf",
+                     cropMarks        : File    = coverDir / "cover_white.pdf",
+                     titleText        : File    = coverDir / "stamp.pdf",
+                     strokeWidth      : Double  = 2.0,
+                     compositionGamma : Double  = 1.6, // 2.0,
+                     innerWidth       : Int     = ((_sheetWidthInner/2).mmToInches * mainDPI).round.toInt & ~1,
+                     davidDPI         : Double  = _davidDPI,
+                     hhDPI            : Int     = mainDPI,
+                     tag              : Boolean = true,
+                     tagWidth         : Int     = 6,
+                     tagHeight        : Int     = 18,
+                     tagMarginRight   : Int     = (6.5 / 25.4 * mainDPI + 0.5).toInt,
+                     tagMarginBottom  : Int     = (6.5 / 25.4 * mainDPI + 0.5).toInt,
+                     renderPDF        : Boolean = true,
+                     assembly         : Option[File] = Some(coverDir / "front-all.pdf"),
+                     maxItems         : Int     = -1,
+                     sheetWidth       : Double  = _sheetWidth,
+                     sheetHeight      : Double  = _sheetHeight,
+                     sheetCutTop      : Double  = _sheetCutTop,
+                     sheetCutLeft     : Double  = _sheetCutLeft,
+                     sheetCutRight    : Double  = _sheetCutRight,
+                     tagMaxRed        : Int     = 177, // 213,
+                     tagMaxGreen      : Int     = 255,
+                     tagMaxBlue       : Int     = 177  // 213
                    )
 
   def main(args: Array[String]): Unit = {
@@ -92,14 +101,20 @@ object MakeCatalogCover {
     // then trunk 1 px left + right, 2 px top + bottom, then extend to
     // target height (850 == 108 mm at 200 dpi)
 
-    val davidIn0  = davidDir.children(_.ext == "svg").sorted[File]
-    val hhIn0     = hhDir   .children(_.ext == hhExt)
+    val davidIn0    = davidDir.children(_.ext == "svg").sorted[File]
+    val hhIn0       = hhDir   .children(_.ext == hhExt)
 //    println(s"size = ${hhIn0.size}")
-    val hhIn1     = hhIn0.sorted[File]
-    val davidIn   = davidIn0 // .take(1)
-    val hhIn      = hhIn1    // .take(1)
-    val compGamma = new MultiplyGammaComposite(gamma = gamma.toFloat)
-    val compMul   = new MultiplyGammaComposite
+    val hhIn1       = hhIn0.sorted[File]
+    val davidIn     = davidIn0 // .take(1)
+    val hhIn        = hhIn1    // .take(1)
+    val compDavid   = new MultiplyGammaComposite(gamma = compositionGamma.toFloat)
+    val compTag     = new MultiplyGammaComposite(maxRed = tagMaxRed, maxGreen = tagMaxGreen, maxBlue = tagMaxBlue)
+    val compNorm    = AlphaComposite.SrcOver
+    val colrWhite50 = new Color(0xFF, 0xFF, 0xFF, 0x7F)
+    val colrBlack50 = new Color(0x00, 0x00, 0x00, 0x7F)
+    val th3         = tagHeight/3
+    val th6         = tagHeight/6
+    val tw2         = tagWidth /2
 
     //    outTemp.parentOption.foreach(_.mkdirs())
     val zipped0   = davidIn zip hhIn
@@ -168,26 +183,42 @@ object MakeCatalogCover {
         val ix = (hhPng.getWidth - innerWidth) >> 1
         // val clipOrig = g2.getClip
         // g2.clipRect(ix, 0, innerWidth, height)
-        g2.setComposite(compGamma)
+        g2.setComposite(compDavid)
         g2.drawImage(resized, ix, 0, null)
 
         if (tag) {
-          g2.setComposite(compMul)
           // g2.setClip(clipOrig)
           for (i <- 0 until 9) {
+            g2.setComposite(compTag)
             val b   = ((frameIdx >>> i) & 1) == 1
             val px1 = width - (tagWidth * 2 * (i + 1)) - tagMarginRight
             val px2 = px1 + tagWidth
-            val ch  = if (b) tagHeight else tagHeight/3
+            val ch  = if (b) tagHeight else th3
             val py1 = height - tagMarginBottom - ch
             val py2 = py1 + ch
             g2.drawImage(hhPng, px1, py1, px2, py2, px1, py1, px2, py2, null)
+
+            g2.setComposite(compNorm)
+            g2.setColor(colrWhite50)
+            g2.drawLine(px1, py1 + th6, px1, py1)
+            g2.drawLine(px1, py1, px1 + tw2, py1)
+            g2.setColor(colrBlack50)
+            val px2m = px2 - 1
+//            val py2m = py2 - 1
+//            g2.drawLine(px2m, py2m - th6, px2m, py2m)
+//            g2.drawLine(px2m, py2m, px2m - tw2, py2m)
+            g2.drawLine(px2m, py1 + th6, px2m, py1)
+            g2.drawLine(px2m, py1, px2m - tw2, py1)
           }
         }
         g2.dispose()
 
         // ImageIO.write(hhPng, "png", composedF)
-        saveImageWithDPI(hhPng, composedF, dpi = hhDPI)
+        val imageFormat = composedF.ext.toLowerCase match {
+          case "png"          => "png"
+          case "jpg" | "jpeg" => "jpg"
+        }
+        saveImageWithDPI(hhPng, composedF, dpi = hhDPI, format = imageFormat)
 
         resized.flush()
         hhPng  .flush()
@@ -203,6 +234,11 @@ object MakeCatalogCover {
       if (renderPDF && !pdfF.exists()) {
         println(s"Rendering... '${pdfF.name}'")
 
+        // bloody includegraphics performs scaling of trim values depending
+        // on image scale. so in the case of jpg which doesn't store dpi
+        // settings, we need to correcgt with a factor of nominal-dpi/72
+        val sheetCutTop1 = if (composedF.ext == "png") sheetCutTop else sheetCutTop * mainDPI / 72.0
+
         val tex =
           f"""\\documentclass{article}
              |\\usepackage[paperwidth=$sheetWidth%gmm,paperheight=$sheetHeight%gmm,top=0mm,left=0mm,bottom=0mm,right=0mm]{geometry}
@@ -217,7 +253,7 @@ object MakeCatalogCover {
              |\\begin{document}
              |\\thispagestyle{empty}
              |\\centering
-             |\\includegraphics[trim=0 0 0 -$sheetMarginTop%gmm]{${composedF.path}}%%
+             |\\includegraphics[width=${sheetWidth - (sheetCutLeft + sheetCutRight)}%gmm,trim=0 0 0 -$sheetCutTop1%gmm]{${composedF.path}}%%
              |\\end{document}
              |""".stripMargin
 
@@ -255,10 +291,18 @@ object MakeCatalogCover {
         //        val cmdAss  = Seq("gs", "-sDEVICE=pdfwrite", "-dPDFSETTINGS=/printer", "-dNOPAUSE", "-dBATCH", "-dSAFER",
         //          s"-sOutputFile=${assemblyF.path}") ++ inPaths
 
-        val cmdAss = "pdftk" +: inPaths :+ "cat" :+ "output" :+ assemblyF.path
+        val tempF     = File.createTemp(suffix = ".pdf")
+
+        val cmdAss    = Seq("pdftk") ++ inPaths ++ Seq("cat", "output", tempF.path)
+        val cmdStamp  = Seq("pdftk", tempF.path, "stamp", titleText.path, "output", assemblyF.path)
 
         import sys.process._
-        Process(cmdAss, wd).!!
+        try {
+          Process(cmdAss  , wd).!!
+          Process(cmdStamp, wd).!!
+        } finally {
+          tempF.delete()
+        }
 
       } else {
         println(s"Skipping '${assemblyF.name}' - file already exists.")
@@ -280,6 +324,15 @@ object MakeCatalogCover {
     } .next()
 
     setDPI(metadata, dpi)
+
+    writeParam match {
+      case p: JPEGImageWriteParam =>
+//        val p = new JPEGImageWriteParam(null)
+        p.setCompressionMode(ImageWriteParam.MODE_EXPLICIT)
+        p.setCompressionQuality(0.99f)
+//        p
+      case _ =>
+    }
 
     val stream = ImageIO.createImageOutputStream(f)
     try {

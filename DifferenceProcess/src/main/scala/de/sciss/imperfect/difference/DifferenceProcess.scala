@@ -197,10 +197,6 @@ object DifferenceProcess {
       //      val lumC      = lumWin(sideLen)
 
       val lumSlide  = Sliding(lum, size = frameSizeL * medianLen, step = frameSize)
-      //      val lumT      = TransposeMatrix(lumSlide, columns = frameSize, rows = medianLen)
-      //      val comp0     = delayFrame(lum, n = sideLen)
-      ////      val comp      = comp0.elastic((sideLen * frameSize + config.blockSize - 1) / config.blockSize)
-      //      val comp      = BufferDisk(comp0)
       val dly   = delayFrame(mkImgSeq(), n = medianSide).take(frameSizeL * (numInput - (medianLen - 1))) // .dropRight(sideLen * frameSize)
       val comp  = extractBrightness(blur(dly))
 
@@ -254,7 +250,7 @@ object DifferenceProcess {
         //        val dlyElastic  = (seqLen * frameSize) / config.blockSize + 1
         //        val exposeSlid  = expose.elastic(dlyElastic) - exposeDly
         // OutOfMemoryError -- buffer to disk instead
-        val exposeSlid  = exposeDly - BufferDisk(expose)
+        val exposeSlid  = exposeDly - expose.elastic((frameSizeL * seqLen) / streamCfg.blockSize + 1) // BufferDisk(expose)
         val sig: GE = if (strange) {
           val in        = exposeSlid
           val resetTr   = Metro(frameSize)
@@ -265,7 +261,8 @@ object DifferenceProcess {
           buf * gain
         } else {
           val gain1 = gain * (Seq[GE](redGain, greenGain, blueGain): GE)
-          (exposeSlid * gain1).max(0.0).min(1.0).pow(gamma)
+          val clipped = (exposeSlid * gain1).max(0.0).min(1.0)
+          if (gamma == 1.0) clipped else clipped.pow(gamma)
         }
 
         val tpe         = if (templateOut.ext == "png") ImageFile.Type.PNG else ImageFile.Type.JPG
