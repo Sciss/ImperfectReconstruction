@@ -1,6 +1,6 @@
 lazy val baseName         = "Imperfect-Difference"
 lazy val baseNameL        = baseName.toLowerCase
-lazy val projectVersion   = "0.2.0-SNAPSHOT"
+lazy val projectVersion   = "0.2.0"
 
 lazy val commonSettings = Seq(
   version             := projectVersion,
@@ -25,7 +25,7 @@ lazy val commonSettings = Seq(
     "com.github.scopt"  %% "scopt"              % "3.5.0",
     "de.sciss"          %% "scissdsp"           % "1.2.3",
     "de.sciss"          %% "scalaaudiofile"     % "1.4.6",
-    "de.sciss"          %% "fscape"             % "2.6.3",
+    "de.sciss"          %% "fscape"             % "2.6.4",
     "com.pi4j"          %  "pi4j-core"          % "1.1",
     "de.sciss"          %  "jrpicam"            % "0.2.0"
 //    "de.sciss"          %% "fscapejobs"         % "1.5.0"
