@@ -14,7 +14,7 @@
 package de.sciss.imperfect.cracks
 
 import java.awt.event.{KeyAdapter, KeyEvent}
-import java.awt.{Color, EventQueue, Frame, GraphicsEnvironment}
+import java.awt.{Color, EventQueue, GraphicsEnvironment}
 import java.net.{InetSocketAddress, SocketAddress}
 
 import de.sciss.osc
@@ -39,6 +39,10 @@ final class Player(config: Config, control: Option[Control]) {
 //  require(script.canExecute, s"${script.name}  - script is not executable!")
 
   private[this] def received(p: Packet, sender: SocketAddress): Unit = p match {
+    case osc.Message("/stage", i: Int) =>
+      val w = window
+      if (w != null) w.setStage(i)
+
     case osc.Message("/shell", cmd @ _*) =>
       val cmdS = cmd.map(_.toString)
       println("Executing shell command:")
@@ -48,8 +52,9 @@ final class Player(config: Config, control: Option[Control]) {
       // client ! osc.Message("/shell_reply", result)
 
     case osc.Message("/color", i: Int) =>
-      if (window.isDefined) EventQueue.invokeLater { () =>
-        window.foreach(_.setBackground(new Color(i)))
+      val w = window
+      if (w != null) EventQueue.invokeLater { () =>
+        w.setBackground(new Color(i))
       }
 
     case osc.Message("/shutdown") =>
@@ -91,7 +96,7 @@ final class Player(config: Config, control: Option[Control]) {
 //  }
 
   @volatile
-  private[this] var window = Option.empty[Frame]
+  private[this] var window: PlayerFrame = _
 
   def start(): Unit = {
     if (client == null || !client.isOpen()) client = mkClient()
@@ -142,7 +147,7 @@ final class Player(config: Config, control: Option[Control]) {
       }
     })
     w.fullScreen()
-    window = Some(w)
+    window = w
   }
 
 //  private def setAlpha(i: Int): Int = {

@@ -92,7 +92,7 @@ object Main {
         ctl.start()
         Some(ctl)
       }
-      log("Creating player")
+      log(s"Creating player at /${config.thisHost}:${config.clientPort}")
       new Player(config, controlOpt).start()
       log("Ready.")
     }
