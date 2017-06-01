@@ -39,6 +39,10 @@ final class Player(config: Config, control: Option[Control]) {
 //  require(script.canExecute, s"${script.name}  - script is not executable!")
 
   private[this] def received(p: Packet, sender: SocketAddress): Unit = p match {
+    case osc.Message("/xy", xi: Int, yi: Int) =>
+      val w = window
+      if (w != null) w.addXY(xi, yi)
+
     case osc.Message("/stage", i: Int) =>
       val w = window
       if (w != null) w.setStage(i)

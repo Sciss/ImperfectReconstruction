@@ -13,21 +13,19 @@
 
 package de.sciss.imperfect.cracks
 
-import de.sciss.numbers
 import java.awt.image.BufferedImage
-import java.awt.{AlphaComposite, Color, Graphics, Graphics2D, GraphicsConfiguration, GraphicsDevice, Point, Toolkit}
+import java.awt.{AlphaComposite, BasicStroke, Color, GraphicsConfiguration, GraphicsDevice, Point, Toolkit}
 
 import scala.annotation.switch
 
-object PlayerFrame {
-  final val TIMER_FPS   : Int = 25
-  final val TIMER_PERIOD: Int = 1000 / TIMER_FPS
-  final val FADE_FRAMES : Int = TIMER_FPS  * 10
-}
 final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: GraphicsConfiguration)
   extends java.awt.Frame(null: String, screenConf) { w =>
 
-  import PlayerFrame._
+  private[this] val TIMER_FPS   : Int = config.fps // 25
+  private[this] val TIMER_PERIOD: Int = 1000 / TIMER_FPS
+  private[this] val FADE_FRAMES : Int = TIMER_FPS  * config.fadeDur // 10
+
+  private[this] val MAX_TRACE   : Int = config.maxTrace // 32
 
   private[this] val imageName   = s"cracks${config.thisChannel + 1}.png"
   private[this] val urlImage    = getClass.getResource(imageName)
@@ -36,6 +34,7 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
   @volatile
   private[this] var _stageSet   = 0
 
+  @volatile
   private[this] var _stageTaken = 0
 
   private[this] var _frameSet   = 0
@@ -64,6 +63,17 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
     }
   }
 
+  def addXY(xi: Int, yi: Int): Unit = {
+    val stage = _stageTaken
+    if (stage == 2 || stage == 3) {
+      val i = _polySet
+      val j = i % MAX_TRACE
+      polyX(j) = xi
+      polyY(j) = yi
+      _polySet = i + 1
+    }
+  }
+
   private[this] var fadeRemain = 0
 
 //  private[this] val NominalWidth  = 1920
@@ -77,6 +87,15 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
     res.fillRect(0, 0, VisibleWidth, VisibleHeight)
     res
   }
+
+  private[this] val strkPoly    = new BasicStroke(config.traceWidth)
+  private[this] val colrPoly    = new Color(config.traceColor)  //Color.red
+  private[this] val polyX       = new Array[Int](MAX_TRACE)
+  private[this] val polyY       = new Array[Int](MAX_TRACE)
+
+  @volatile
+  private[this] var _polySet    = 0
+  private[this] var _polyTaken  = 0
 
   private[this] def draw(): Unit = {
     _frameSet += 1
@@ -95,26 +114,11 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
         g.setColor(w.getBackground)
         g.fillRect(0, 0, width, height)
         g.drawImage(OffScreenImg, x, y, null)
-        //            0,             0, NominalWidth, VisibleHeight, null)
-//        if (width == NominalWidth && height == NominalHeight) {
-//          g.drawImage(OffScreenImg,            0,             0, NominalWidth, VisibleHeight,
-//            0,             0, NominalWidth, VisibleHeight, null)
-//          g.drawImage(OffScreenImg,            0, VisibleHeight, NominalWidth, NominalHeight,
-//            NominalWidth,             0, VisibleWidth, VisibleHeight, null)
-//        } else {
-//          if (!haveWarnedWinSize) {
-//            warn(s"Full screen window has dimensions $width x $height instead of $NominalWidth x $NominalHeight")
-//            haveWarnedWinSize = true
-//          }
-//          g.drawImage(OffScreenImg,            0,        0, width,        height/2,
-//            0,        0, NominalWidth, VisibleHeight, null)
-//          g.drawImage(OffScreenImg,            0, height/2, width,        height,
-//            NominalWidth,        0, VisibleWidth, VisibleHeight, null)
-//          g.dispose()
-//        }
       } while (strategy.contentsRestored())
       strategy.show()
     } while (strategy.contentsLost())
+
+    getToolkit.sync()
   }
 
   private def paintOffScreen(): Unit = {
@@ -132,25 +136,32 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
       (stage: @switch) match {
         case 1 | 4 =>
           fadeRemain = FADE_FRAMES
+
+        case 2 =>
+          _polySet    = 0
+          _polyTaken  = 0
+
         case _ =>
       }
     }
 
     val width   = 1024 // getWidth
     val height  = 1024 // getHeight
-    val x         = 0 // (width  - 1024) >> 1
+    val x       = 0 // (width  - 1024) >> 1
     val y       = 0 // (height - 1024) >> 1
-    g2.setColor(w.getBackground)
-    g2.fillRect(0, 0, width, height)
 
     (stage: @switch) match {
       case 0 =>
+        g2.setColor(w.getBackground)
+        g2.fillRect(0, 0, width, height)
+
       case 1 | 4 =>
+        g2.setColor(w.getBackground)
+        g2.fillRect(0, 0, width, height)
         val compOrig  = g2.getComposite
         val fd        = fadeRemain
         // println(s"fd $fd FADE_FRAMES $FADE_FRAMES")
         val fd1       = if (stage == 1) FADE_FRAMES - fd else fd
-        import numbers.Implicits._
         val alpha     = fd1.toFloat / FADE_FRAMES // fd1.linlin(0, FADE_FRAMES, 1f, 0f)
         // println(s"alpha $alpha")
         if (fd > 1) fadeRemain = fd - 1
@@ -163,6 +174,20 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
 
       case 2 | 3 =>
         if (image != null) g2.drawImage(image, x, y, this)
+
+        val n = _polyTaken
+        if (n > 0) {
+          g2.setStroke(strkPoly)
+          g2.setColor (colrPoly)
+          g2.drawPolygon(polyX, polyY, _polyTaken)
+        }
+
+        if (stage == 2) {
+          val m = math.min(_polySet, MAX_TRACE)
+          if (m > n) _polyTaken = n + 1
+        } else {
+          if (n > 0) _polyTaken = n - 1
+        }
 
       case _ =>
     }

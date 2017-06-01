@@ -78,6 +78,25 @@ object Main {
         .text (s"Sound channel, counting from zero (default ${default.thisChannel})")
         .action   { (v, c) => c.copy(thisChannel = v) }
 
+      opt[Int] ("fps")
+        .text (s"Animation speed in fps (default ${default.fps})")
+        .action   { (v, c) => c.copy(fps = v) }
+
+      opt[Int] ("fade-dur")
+        .text (s"Fade duration in seconds (default ${default.fadeDur})")
+        .action   { (v, c) => c.copy(fadeDur = v) }
+
+      opt[Int] ("max-trace")
+        .text (s"Maximum trace length (default ${default.maxTrace})")
+        .action   { (v, c) => c.copy(maxTrace = v) }
+
+      opt[Int] ("trace-color")
+        .text (s"Trace color 0xRRGGBB (default ${default.traceColor.toHexString})")
+        .action   { (v, c) => c.copy(traceColor = v) }
+
+      opt[Int] ("trace-width")
+        .text (s"Trace stroke width (default ${default.traceWidth})")
+        .action   { (v, c) => c.copy(traceWidth = v) }
     }
     p.parse(args, default).fold(sys.exit(1)) { config =>
       if (config.disableEnergySaving) {
