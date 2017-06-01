@@ -105,7 +105,7 @@ final case class Config(isControl: Boolean, thisHost: String, clientPort: Int = 
                         thisChannel: Int,
                         fps: Int = 30,
                         fadeDur: Int = 8,
-                        maxTrace: Int = 64,
+                        maxTrace: Int = 80,
                         traceColor: Int = 0xFF0000,
                         traceWidth: Int = 3,
                         dbusName: String = "" /* "de.sciss.imperfect.Player%d" */)

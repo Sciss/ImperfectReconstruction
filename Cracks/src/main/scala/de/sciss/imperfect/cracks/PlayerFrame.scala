@@ -26,6 +26,7 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
   private[this] val FADE_FRAMES : Int = TIMER_FPS  * config.fadeDur // 10
 
   private[this] val MAX_TRACE   : Int = config.maxTrace // 32
+  private[this] val MAX_TRACE_M : Int = MAX_TRACE - 1
 
   private[this] val imageName   = s"cracks${config.thisChannel + 1}.png"
   private[this] val urlImage    = getClass.getResource(imageName)
@@ -67,10 +68,16 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
     val stage = _stageTaken
     if (stage == 2 || stage == 3) {
       val i = _polySet
-      val j = i % MAX_TRACE
-      polyX(j) = xi
-      polyY(j) = yi
-      _polySet = i + 1
+      if (i == MAX_TRACE) {
+        System.arraycopy(polyXSet, 1, polyXSet, 0, MAX_TRACE_M)
+        System.arraycopy(polyYSet, 1, polyYSet, 0, MAX_TRACE_M)
+        polyXSet(MAX_TRACE_M) = xi
+        polyYSet(MAX_TRACE_M) = yi
+      } else {
+        polyXSet(i) = xi
+        polyYSet(i) = yi
+        _polySet = i + 1
+      }
     }
   }
 
@@ -90,8 +97,8 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
 
   private[this] val strkPoly    = new BasicStroke(config.traceWidth)
   private[this] val colrPoly    = new Color(config.traceColor)  //Color.red
-  private[this] val polyX       = new Array[Int](MAX_TRACE)
-  private[this] val polyY       = new Array[Int](MAX_TRACE)
+  private[this] val polyXSet    = new Array[Int](MAX_TRACE)
+  private[this] val polyYSet    = new Array[Int](MAX_TRACE)
 
   @volatile
   private[this] var _polySet    = 0
@@ -179,7 +186,7 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
         if (n > 0) {
           g2.setStroke(strkPoly)
           g2.setColor (colrPoly)
-          g2.drawPolygon(polyX, polyY, _polyTaken)
+          g2.drawPolyline(polyXSet, polyYSet, _polyTaken)
         }
 
         if (stage == 2) {
