@@ -41,12 +41,12 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
   private[this] var _frameSet   = 0
   private[this] var _frameTaken = 0
 
-  private[this] val timer       = new javax.swing.Timer(TIMER_PERIOD, _ => refresh())
+  private[this] val timer       = new javax.swing.Timer(TIMER_PERIOD, _ => draw())
 
   if (image == null) println(s"Warning: could not find image resource '$imageName'")
 
   setUndecorated  (true)
-  // setIgnoreRepaint(true)
+  setIgnoreRepaint(true)
   setBackground(new Color(config.background))
 
   /** Stages:
@@ -66,26 +66,69 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
 
   private[this] var fadeRemain = 0
 
-  private[this] def refresh(): Unit = {
-    // log("REFRESH")
-    _frameSet += 1
-    repaint()
-    getToolkit.sync()
+//  private[this] val NominalWidth  = 1920
+//  private[this] val NominalHeight = 1080
+  private[this] val VisibleWidth  = 1024 // 1280
+  private[this] val VisibleHeight = 1024
+  private[this] val OffScreenImg  = new BufferedImage(VisibleWidth, VisibleHeight, BufferedImage.TYPE_INT_ARGB)
+  private[this] val OffScreenG    = {
+    val res = OffScreenImg.createGraphics()
+    res.setColor(Color.black)
+    res.fillRect(0, 0, VisibleWidth, VisibleHeight)
+    res
   }
 
-  override def paint(g: Graphics): Unit = {
-    // super.paint(g)
+  private[this] def draw(): Unit = {
+    _frameSet += 1
+//    repaint()
+//    getToolkit.sync()
+
+    paintOffScreen()
+    val width     = w.getWidth
+    val height    = w.getHeight
+    val strategy  = w.getBufferStrategy
+    val x         = (width  - 1024) >> 1
+    val y         = (height - 1024) >> 1
+    do {
+      do {
+        val g = strategy.getDrawGraphics
+        g.setColor(w.getBackground)
+        g.fillRect(0, 0, width, height)
+        g.drawImage(OffScreenImg, x, y, null)
+        //            0,             0, NominalWidth, VisibleHeight, null)
+//        if (width == NominalWidth && height == NominalHeight) {
+//          g.drawImage(OffScreenImg,            0,             0, NominalWidth, VisibleHeight,
+//            0,             0, NominalWidth, VisibleHeight, null)
+//          g.drawImage(OffScreenImg,            0, VisibleHeight, NominalWidth, NominalHeight,
+//            NominalWidth,             0, VisibleWidth, VisibleHeight, null)
+//        } else {
+//          if (!haveWarnedWinSize) {
+//            warn(s"Full screen window has dimensions $width x $height instead of $NominalWidth x $NominalHeight")
+//            haveWarnedWinSize = true
+//          }
+//          g.drawImage(OffScreenImg,            0,        0, width,        height/2,
+//            0,        0, NominalWidth, VisibleHeight, null)
+//          g.drawImage(OffScreenImg,            0, height/2, width,        height,
+//            NominalWidth,        0, VisibleWidth, VisibleHeight, null)
+//          g.dispose()
+//        }
+      } while (strategy.contentsRestored())
+      strategy.show()
+    } while (strategy.contentsLost())
+  }
+
+  private def paintOffScreen(): Unit = {
 
     if (_frameTaken == _frameSet) return
     _frameTaken = _frameSet
 
-    val g2 = g.asInstanceOf[Graphics2D]
+    val g2 = OffScreenG // g.asInstanceOf[Graphics2D]
 
     var stage = _stageTaken
     if (_stageSet != stage) {
-      println(s"New stage $stage")
       stage       = _stageSet
       _stageTaken = stage
+      println(s"New stage $stage")
       (stage: @switch) match {
         case 1 | 4 =>
           fadeRemain = FADE_FRAMES
@@ -93,10 +136,12 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
       }
     }
 
-    val width   = getWidth
-    val height  = getHeight
-    val x       = (width  - 1024) >> 1
-    val y       = (height - 1024) >> 1
+    val width   = 1024 // getWidth
+    val height  = 1024 // getHeight
+    val x         = 0 // (width  - 1024) >> 1
+    val y       = 0 // (height - 1024) >> 1
+    g2.setColor(w.getBackground)
+    g2.fillRect(0, 0, width, height)
 
     (stage: @switch) match {
       case 0 =>
@@ -141,5 +186,12 @@ final class PlayerFrame(config: Config, screen: GraphicsDevice, screenConf: Grap
     val cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)
     val cursor = w.getToolkit.createCustomCursor(cursorImg, new Point(0, 0), "blank")
     w.setCursor(cursor)
+
+    // Ok, so there is some weird bug in that sometime the
+    // buffer doesn't have the correct size. For now, it
+    // seems, waiting with the thread a bit helps.
+      Thread.sleep(50)
+    w.createBufferStrategy(2)
+    Thread.sleep(50)
   }
 }
