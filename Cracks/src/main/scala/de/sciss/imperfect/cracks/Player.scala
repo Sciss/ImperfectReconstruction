@@ -2,7 +2,7 @@
  *  Player.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -14,58 +14,43 @@
 package de.sciss.imperfect.cracks
 
 import java.awt.event.{KeyAdapter, KeyEvent}
-import java.awt.image.BufferedImage
-import java.awt.{Color, EventQueue, Font, Frame, Graphics, GraphicsEnvironment, Point}
-import java.net.InetSocketAddress
+import java.awt.{Color, EventQueue, Frame, GraphicsEnvironment}
+import java.net.{InetSocketAddress, SocketAddress}
 
-import de.sciss.file._
 import de.sciss.osc
 import de.sciss.osc.{Packet, UDP}
 
-import scala.sys.process.ProcessLogger
 import scala.util.Try
 
 final class Player(config: Config, control: Option[Control]) {
-  @volatile
-  private[this] var status: Status = Idle
-
-  private[this] val playSync = new AnyRef
-
-  private def mkClient(): UDP.Client = {
+  private def mkClient(): UDP.Receiver.Undirected /* Client */ = {
     val c   = UDP.Config()
     c.localSocketAddress = new InetSocketAddress(config.thisHost /* InetAddress.getLocalHost() */, config.clientPort)
-    val res = UDP.Client(new InetSocketAddress("192.168.0.11", 57110), c)
+//    val res = UDP.Client(new InetSocketAddress("192.168.0.11", 57110), c)
+    val res = UDP.Receiver(c)
     res.action = received
     res
   }
 
   @volatile
-  private[this] var client: UDP.Client = _
+  private[this] var client: UDP.Receiver.Undirected /* Client */ = _
 
-  private[this] val script = config.baseDir/"dbuscontrol.sh"
-//  private[this] val script = config.baseDir/"imperfect_dbus.sh"
-  require(script.canExecute, s"${script.name}  - script is not executable!")
+//  private[this] val script = config.baseDir/"dbuscontrol.sh"
+//  require(script.canExecute, s"${script.name}  - script is not executable!")
 
-  private def sendStatus(): Unit = client ! osc.Message("/status", status.id)
-
-  private[this] def received(p: Packet): Unit = p match {
-    case osc.Message("/status") =>
-      sendStatus()
-
+  private[this] def received(p: Packet, sender: SocketAddress): Unit = p match {
     case osc.Message("/shell", cmd @ _*) =>
       val cmdS = cmd.map(_.toString)
       println("Executing shell command:")
       println(cmdS.mkString(" "))
       import sys.process._
-      val result = Try(cmdS.!!).toOption.getOrElse("ERROR")
-      client ! osc.Message("/shell_reply", result)
+      /* val result = */ Try(cmdS.!!).toOption.getOrElse("ERROR")
+      // client ! osc.Message("/shell_reply", result)
 
     case osc.Message("/color", i: Int) =>
-      if (window.isDefined) EventQueue.invokeLater(new Runnable {
-        def run(): Unit = {
-          window.foreach(_.setBackground(new Color(i)))
-        }
-      })
+      if (window.isDefined) EventQueue.invokeLater { () =>
+        window.foreach(_.setBackground(new Color(i)))
+      }
 
     case osc.Message("/shutdown") =>
       log("shutting down...")
@@ -79,44 +64,42 @@ final class Player(config: Config, control: Option[Control]) {
       Console.err.println(s"Unknown OSC message $p from control")
   }
 
-  private def secsToHHMMSS(secs: Float): String = {
-    val sec  = secs.toInt
-    val secM = sec % 60
-    val min  = sec / 60
-    val minM = min % 60
-    val hour = min / 60
-    f"$hour%02d:$minM%02d:$secM%02d"
-  }
+//  private def secsToHHMMSS(secs: Float): String = {
+//    val sec  = secs.toInt
+//    val secM = sec % 60
+//    val min  = sec / 60
+//    val minM = min % 60
+//    val hour = min / 60
+//    f"$hour%02d:$minM%02d:$secM%02d"
+//  }
 
-  private[this] val logNone     = ProcessLogger((_: String) => ())
-  private[this] val logErrors   = ProcessLogger((_: String) => (), (s: String) => Console.err.println(s))
-  private[this] val hasDbusName = !config.dbusName.isEmpty
-  private[this] val dbusIsInc   = config.dbusName.contains("%d")
-  private[this] var dbusCount   = 0
+//  private[this] val logNone     = ProcessLogger((_: String) => ())
+//  private[this] val logErrors   = ProcessLogger((_: String) => (), (s: String) => Console.err.println(s))
+//  private[this] val hasDbusName = !config.dbusName.isEmpty
+//  private[this] val dbusIsInc   = config.dbusName.contains("%d")
+//  private[this] var dbusCount   = 0
 
-  private def mkDbusName(inc: Boolean = false): String = {
-    if (dbusIsInc) {
-      if (inc) dbusCount += 1
-      config.dbusName.format(dbusCount)
-    } else if (hasDbusName) {
-      config.dbusName
-    } else {
-      "org.mpris.MediaPlayer2.omxplayer"
-    }
-  }
+//  private def mkDbusName(inc: Boolean = false): String = {
+//    if (dbusIsInc) {
+//      if (inc) dbusCount += 1
+//      config.dbusName.format(dbusCount)
+//    } else if (hasDbusName) {
+//      config.dbusName
+//    } else {
+//      "org.mpris.MediaPlayer2.omxplayer"
+//    }
+//  }
 
   @volatile
   private[this] var window = Option.empty[Frame]
 
   def start(): Unit = {
+    if (client == null || !client.isOpen()) client = mkClient()
+    client.connect()
+//    sendStatus()
     // conFadeThread.start()
-    if (!config.small) EventQueue.invokeLater(new Runnable {
-      def run(): Unit = openBlackWindow()
-    })
+    if (!config.small) EventQueue.invokeLater(() => openWindow())
   }
-
-  @volatile
-  private[this] var debugMessage = ""
 
   private def debugThreads(): Unit = {
     import scala.collection.JavaConverters._
@@ -135,26 +118,11 @@ final class Player(config: Config, control: Option[Control]) {
     }
   }
 
-  private def openBlackWindow(): Unit = {
+  private def openWindow(): Unit = {
     val screen      = GraphicsEnvironment.getLocalGraphicsEnvironment.getDefaultScreenDevice
     val screenConf  = screen.getDefaultConfiguration
-    val fnt         = new Font(Font.SANS_SERIF, Font.BOLD, 36)
-    val w = new Frame(null, screenConf) {
-      override def paint(g: Graphics): Unit = {
-        super.paint(g)
-        val m = debugMessage
-        if (!m.isEmpty) {
-          g.setFont(fnt)
-          val fm = g.getFontMetrics
-          val tw = fm.stringWidth(debugMessage)
-          g.setColor(Color.white)
-          g.drawString(m, (getWidth - tw)/2, getHeight/2 - fm.getAscent)
-        }
-      }
-    }
-    w.setUndecorated  (true)
-//    w.setIgnoreRepaint(true)
-    w.setBackground(new Color(config.background))
+//    val fnt         = new Font(Font.SANS_SERIF, Font.BOLD, 36)
+    val w = new PlayerFrame(config, screen, screenConf)
     w.addKeyListener(new KeyAdapter {
       override def keyPressed(e: KeyEvent): Unit = {
         e.getKeyCode match {
@@ -173,60 +141,53 @@ final class Player(config: Config, control: Option[Control]) {
         }
       }
     })
-    w.setSize(screenConf.getBounds.getSize)
-    screen.setFullScreenWindow(w)
-    w.requestFocus()
-
-    // "hide" cursor
-    val cursorImg = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB)
-    val cursor = w.getToolkit.createCustomCursor(cursorImg, new Point(0, 0), "blank")
-    w.setCursor(cursor)
+    w.fullScreen()
     window = Some(w)
   }
 
-  private def setAlpha(i: Int): Int = {
-    val alpha = math.max(0, math.min(255, i))
-    runScript("setalpha" :: alpha.toString :: Nil)
-  }
+//  private def setAlpha(i: Int): Int = {
+//    val alpha = math.max(0, math.min(255, i))
+//    runScript("setalpha" :: alpha.toString :: Nil)
+//  }
 
-  private def fade(from: Float, to: Float, dur: Float): Unit = {
-    val start = (from * 255 + 0.5f).toInt
-    val end   = (to   * 255 + 0.5f).toInt
-    val durM  = (dur * 1000).toInt
-    val t1    = System.currentTimeMillis
-    // val t3    = t1 + durM
-    //     println(s"t1 = $t1, t3 = $t3, start = $start, end - $end")
-    setAlpha(start)
-    var last  = start
-    while (last != end) {
-      val t2   = System.currentTimeMillis
-      val frac = math.min(1.0, (t2.toDouble - t1) / durM)
-      val curr = ((frac * (to - from) + from) * 255 + 0.5).toInt
-      //        val curr = (t2.linlin(t1, t3, from, to) + 0.5).toInt
-      //        println(s"t2 = $t2, curr = $curr")
-      if (curr != last) {
-        setAlpha(curr)
-        last = curr
-      } else {
-        // Thread.`yield()`
-        Thread.sleep(0)
-      }
-    }
-    // println("Done.")
-  }
+//  private def fade(from: Float, to: Float, dur: Float): Unit = {
+//    val start = (from * 255 + 0.5f).toInt
+//    val end   = (to   * 255 + 0.5f).toInt
+//    val durM  = (dur * 1000).toInt
+//    val t1    = System.currentTimeMillis
+//    // val t3    = t1 + durM
+//    //     println(s"t1 = $t1, t3 = $t3, start = $start, end - $end")
+//    setAlpha(start)
+//    var last  = start
+//    while (last != end) {
+//      val t2   = System.currentTimeMillis
+//      val frac = math.min(1.0, (t2.toDouble - t1) / durM)
+//      val curr = ((frac * (to - from) + from) * 255 + 0.5).toInt
+//      //        val curr = (t2.linlin(t1, t3, from, to) + 0.5).toInt
+//      //        println(s"t2 = $t2, curr = $curr")
+//      if (curr != last) {
+//        setAlpha(curr)
+//        last = curr
+//      } else {
+//        // Thread.`yield()`
+//        Thread.sleep(0)
+//      }
+//    }
+//    // println("Done.")
+//  }
 
-  private def fadeIn (dur: Float): Unit = fade(from = 0f, to = 1f, dur = dur)
-  private def fadeOut(dur: Float): Unit = fade(from = 1f, to = 0f, dur = dur)
+//  private def fadeIn (dur: Float): Unit = fade(from = 0f, to = 1f, dur = dur)
+//  private def fadeOut(dur: Float): Unit = fade(from = 1f, to = 0f, dur = dur)
 
-  private def runScript(args: List[String], ignoreError: Boolean = false): Int = {
-    import sys.process._
-//    val name = mkDbusName()
-//    val pb = Process(script.path :: args, None, "OMXPLAYER_DBUS_NAME" -> name)
-//    val pb = Process("sudo" :: script.path :: args, None, "OMXPLAYER_DBUS_NAME" -> name)
-    val pb = script.path :: args
-    val res = if (ignoreError) pb.!<(logNone) else pb.!
-    res
-  }
+//  private def runScript(args: List[String], ignoreError: Boolean = false): Int = {
+//    import sys.process._
+////    val name = mkDbusName()
+////    val pb = Process(script.path :: args, None, "OMXPLAYER_DBUS_NAME" -> name)
+////    val pb = Process("sudo" :: script.path :: args, None, "OMXPLAYER_DBUS_NAME" -> name)
+//    val pb = script.path :: args
+//    val res = if (ignoreError) pb.!<(logNone) else pb.!
+//    res
+//  }
 
-  private def stopVideo(): Unit = runScript("stop" :: Nil)
+//  private def stopVideo(): Unit = runScript("stop" :: Nil)
 }

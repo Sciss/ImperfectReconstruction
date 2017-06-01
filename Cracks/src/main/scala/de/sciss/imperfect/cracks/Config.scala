@@ -2,7 +2,7 @@
  *  Config.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -29,10 +29,19 @@ object Config {
     "b8:27:eb:72:d1:70" -> "192.168.0.16",
     "b8:27:eb:d9:a5:b9" -> "192.168.0.17",
     "b8:27:eb:c5:19:a6" -> "192.168.0.18",
-    "b8:27:eb:36:2e:72" -> "192.168.0.19"
+    "b8:27:eb:36:2e:72" -> "192.168.0.19",
+    "b8:27:eb:85:e5:30" -> "192.168.0.24"
   )
 
-  val controlIP = "192.168.0.11"
+  /** Maps IP addresses to logical (sound) channels, zero-based index. */
+  val defaultChannels: Map[String, Int] = Map(
+    "192.168.0.11" -> 0,
+    "192.168.0.12" -> 1,
+    "192.168.0.13" -> 2,
+    "192.168.0.24" -> 3
+  )
+
+  val controlIP = "192.168.0.77" // "192.168.0.11"
 
   // def main(args: Array[String]): Unit = checkIP()
 
@@ -89,8 +98,9 @@ object Config {
   }
 }
 final case class Config(isControl: Boolean, thisHost: String, clientPort: Int = 57120,
-                        baseDir: File = userHome/"Documents"/"projects"/"Imperfect"/"inner_space",
-                        numClients: Int = 8, dumpOSC: Boolean = false, small: Boolean = false,
+                        baseDir: File = userHome/"Documents"/"projects"/"Imperfect"/"cracks",
+                        numClients: Int = 4, dumpOSC: Boolean = false, small: Boolean = false,
                         disableEnergySaving: Boolean = true,
                         background: Int = 0xFF00000,
+                        thisChannel: Int,
                         dbusName: String = "" /* "de.sciss.imperfect.Player%d" */)

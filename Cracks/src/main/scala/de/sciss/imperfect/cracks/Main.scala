@@ -2,7 +2,7 @@
  *  Main.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -27,29 +27,28 @@ object Main {
   }
 
   def main(args: Array[String]): Unit = {
-    println(s"-- Imperfect Reconstruction v${buildInfString("version")}, built ${buildInfString("builtAtString")} --")
+    println(s"-- Imperfect Reconstruction Cracks v${buildInfString("version")}, built ${buildInfString("builtAtString")} --")
 
-    val myIP    = Config.checkIP()
-    val default = Config(thisHost = myIP, isControl = myIP == Config.controlIP)
+    val myIP            = Config.checkIP()
+    val defaultChannel  = Config.defaultChannels.getOrElse(myIP, 0)
+    val default         = Config(thisHost = myIP, isControl = myIP == Config.controlIP, thisChannel = defaultChannel)
 
-    val p = new scopt.OptionParser[Config]("Imperfect-RaspiPlayer") {
+    val p = new scopt.OptionParser[Config]("Imperfect-Cracks") {
       opt[File]("base-dir")
         .text (s"Base directory (default: ${default.baseDir})")
-//        .required()
         .action { (f, c) => c.copy(baseDir = f) }
 
       opt[String] ('h', "host")
         .text (s"This host's IP address (default: ${default.thisHost})")
-//        .required()
         .action   { (v, c) => c.copy(thisHost = v) }
 
       opt[Unit] ('d', "dump-osc")
         .text (s"Enable OSC dump (default ${default.dumpOSC})")
-        .action   { (v, c) => c.copy(dumpOSC = true) }
+        .action   { (_, c) => c.copy(dumpOSC = true) }
 
       opt[Unit] ('c', "control")
         .text (s"Instance is control center (default ${default.isControl})")
-        .action   { (v, c) => c.copy(isControl = true) }
+        .action   { (_, c) => c.copy(isControl = true) }
 
       opt[Int] ("client-port")
         .text (s"Client OSC port (default ${default.clientPort})")
@@ -61,11 +60,11 @@ object Main {
 
       opt[Unit] ("small")
         .text (s"Small display for debugging (default ${default.small})")
-        .action   { (v, c) => c.copy(small = true) }
+        .action   { (_, c) => c.copy(small = true) }
 
       opt[Unit] ("keep-energy")
         .text ("Do not turn off energy saving")
-        .action   { (v, c) => c.copy(disableEnergySaving = false) }
+        .action   { (_, c) => c.copy(disableEnergySaving = false) }
 
       opt[Int] ("background")
         .text (s"Background color 0xRRGGBB (default ${default.background.toHexString})")
@@ -74,6 +73,11 @@ object Main {
       opt[String] ("dbus")
         .text (s"dbus name for omxplayer (default: ${default.dbusName})")
         .action   { (v, c) => c.copy(dbusName = v) }
+
+      opt[Int] ("channel")
+        .text (s"Sound channel, counting from zero (default ${default.thisChannel})")
+        .action   { (v, c) => c.copy(thisChannel = v) }
+
     }
     p.parse(args, default).fold(sys.exit(1)) { config =>
       if (config.disableEnergySaving) {

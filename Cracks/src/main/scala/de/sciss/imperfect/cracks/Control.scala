@@ -2,7 +2,7 @@
  *  Control.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -18,13 +18,12 @@ import java.net.{InetSocketAddress, SocketAddress}
 import de.sciss.osc
 import de.sciss.osc.{Packet, UDP}
 
-import scala.util.Random
 import scala.util.control.NonFatal
 
 final class Control(config: Config) {
   import config._
 
-  private[this] implicit val random: Random = new Random()
+//  private[this] implicit val random: Random = new Random()
 
   private[this] val clients: Array[InetSocketAddress] = {
     // /etc/dhcpcd.conf
@@ -88,11 +87,6 @@ final class Control(config: Config) {
     }
     Main.reboot()
   }
-
-  private[this] var isDP        = random.nextBoolean()
-  private[this] var streakToGo  = 0
-
-  private[this] var spawnCount  = 0
 
   private[this] var isFirstReady = true
 
