@@ -99,7 +99,28 @@ final class Control(config: Config)(implicit screens: Screens) {
 
   private[this] var spawnCount  = 0
 
+  private[this] var lastError   = "(no error)"
+
   private def spawnVideo(): Unit = {
+    var success = false
+    while (!success)
+      try {
+        spawnVideoImpl()
+        success = true
+      } catch {
+        case NonFatal(ex) =>
+          val boas  = new java.io.ByteArrayOutputStream
+          val ps    = new java.io.PrintStream(boas)
+          ex.printStackTrace(ps)
+          ps.close()
+          lastError = new String(boas.toByteArray, "UTF-8")
+          ex.printStackTrace()
+          Thread.sleep(1000)
+          spawnVideo()
+      }
+  }
+
+  private def spawnVideoImpl(): Unit = {
 //    clientsReady = true
 //    val cmdTest = osc.Message("/test")
     var j = 0
@@ -183,6 +204,15 @@ final class Control(config: Config)(implicit screens: Screens) {
           try {
             val c = clients(idx)
             transmitter.send(cmd, c)
+          } catch {
+            case NonFatal(ex) =>
+              ex.printStackTrace()
+          }
+
+        case osc.Message("/query-error") =>
+          val cmd = osc.Message("/last-error", lastError)
+          try {
+            transmitter.send(cmd, addr)
           } catch {
             case NonFatal(ex) =>
               ex.printStackTrace()

@@ -49,7 +49,11 @@ object Play {
   */
 final case class Play(file: String, delay: Float, start: Float, duration: Float, orientation: Int,
                       fadeIn: Float, fadeOut: Float)
-  extends osc.Message("/play", file, delay, start, duration, orientation, fadeIn, fadeOut)
+  extends osc.Message("/play", file, delay, start, duration, orientation, fadeIn, fadeOut) {
+
+  override def toString =
+    s"Play($file, delay = $delay, start = $start, duration = $duration, orientation = $orientation, fadeIn = $fadeIn, fadeOut = $fadeOut"
+}
 
 object PlayMessage {
   def unapply(m: osc.Message): Option[Play] = m match {
