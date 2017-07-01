@@ -2,7 +2,7 @@
  *  Control.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -21,28 +21,31 @@ import de.sciss.osc.{Packet, UDP}
 import scala.util.Random
 import scala.util.control.NonFatal
 
-final class Control(config: Config) {
+final class Control(config: Config)(implicit screens: Screens) {
   import config._
 
   private[this] implicit val random: Random = new Random()
 
   private[this] val clients: Array[InetSocketAddress] = {
-    // /etc/dhcpcd.conf
-    val res = Array.tabulate(8) { i =>
-      new InetSocketAddress(s"192.168.0.${11 + i}", clientPort)
+    val nIds  = config.clientIds.size
+    val n     = math.max(config.numClients, nIds)
+    val res   = Array.tabulate(n) { i =>
+      val id = if (i < nIds) config.clientIds(i) else 11 + i
+      new InetSocketAddress(s"192.168.0.$id", clientPort)
     }
     res
   }
 
   private[this] val clientStatus = Array.fill[Status](clients.length)(Unknown)
 
-  private[this] val serverConfig = {
+  private[this] val serverConfig: UDP.Config = {
     val c = UDP.Config()
     c.localSocketAddress = ServerAddress
     c.build
   }
   private[this] val transmitter = UDP.Transmitter(serverConfig)
-  private[this] val receiver    = {
+
+  private[this] val receiver: UDP.Receiver.Undirected = {
     val res = UDP.Receiver(transmitter.channel)
     res.action = received
     res
@@ -150,7 +153,7 @@ final class Control(config: Config) {
 
   private[this] var isFirstReady = true
 
-  private[this] val numClientsC = math.min(clients.length, config.numClients)
+  private[this] val numClientsC = clients.length // math.min(clients.length, config.numClients)
 
   private def received(p: Packet, addr: SocketAddress): Unit = {
     var clientIdx = -1
@@ -173,6 +176,16 @@ final class Control(config: Config) {
                 clientStatus(j) = Idle
             }
             j += 1
+          }
+
+        case osc.Message("/forward-to", idx: Int, cmdM: String, args @ _*) =>
+          val cmd = osc.Message(cmdM, args: _*)
+          try {
+            val c = clients(idx)
+            transmitter.send(cmd, c)
+          } catch {
+            case NonFatal(ex) =>
+              ex.printStackTrace()
           }
 
         case _ =>

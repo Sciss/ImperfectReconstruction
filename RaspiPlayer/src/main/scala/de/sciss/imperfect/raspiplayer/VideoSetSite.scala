@@ -2,7 +2,7 @@
  *  VideoSetSite.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -34,7 +34,7 @@ object VideoSetSite extends VideoSet {
 
   private[this] final val nameFmt = "site/site%d.mp4"
 
-  def select()(implicit random: Random): Vec[Play] = {
+  def select()(implicit random: Random, screens: Screens): Vec[Play] = {
     import Util._
 
     val durTotI: Int = rrand(minDur, maxDur)
@@ -48,7 +48,7 @@ object VideoSetSite extends VideoSet {
       val fadeIn  = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
       val fadeOut = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
 
-      val screen  = Screen(screenIdx)
+      val screen  = screens(screenIdx)
       val orient  = choose(screen.orientations)
 
 //      println(s"screenIdx $screenIdx, vidIdx $vidIdx, hanging? ${screen.isHanging}, orientations: ${screen.orientations}")

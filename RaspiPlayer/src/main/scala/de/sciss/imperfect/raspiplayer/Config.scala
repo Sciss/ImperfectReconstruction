@@ -2,7 +2,7 @@
  *  Config.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -18,6 +18,8 @@ import java.net.InetAddress
 
 import de.sciss.file._
 
+import scala.collection.immutable.{Seq => ISeq}
+
 object Config {
   /** Maps MAC addresses to IP addresses */
   val ipMap: Map[String, String] = Map(
@@ -29,7 +31,9 @@ object Config {
     "b8:27:eb:72:d1:70" -> "192.168.0.16",
     "b8:27:eb:d9:a5:b9" -> "192.168.0.17",
     "b8:27:eb:c5:19:a6" -> "192.168.0.18",
-    "b8:27:eb:36:2e:72" -> "192.168.0.19"
+    "b8:27:eb:36:2e:72" -> "192.168.0.19",
+    "b8:27:eb:36:50:58" -> "192.168.0.22",
+    "b8:27:eb:85:e5:30" -> "192.168.0.24"
   )
 
   val controlIP = "192.168.0.11"
@@ -90,7 +94,9 @@ object Config {
 }
 final case class Config(isControl: Boolean, thisHost: String, clientPort: Int = 57120,
                         baseDir: File = userHome/"Documents"/"projects"/"Imperfect"/"inner_space",
-                        numClients: Int = 8, dumpOSC: Boolean = false, small: Boolean = false,
+                        numClients: Int = 5, clientIds: ISeq[Int] = Nil, dumpOSC: Boolean = false,
+                        small: Boolean = false,
                         disableEnergySaving: Boolean = true,
                         background: Int = 0xFF00000,
-                        dbusName: String = "" /* "de.sciss.imperfect.Player%d" */)
+                        dbusName: String = "" /* "de.sciss.imperfect.Player%d" */,
+                        isESC: Boolean = false, winX: Int = -1, winY: Int = -1)

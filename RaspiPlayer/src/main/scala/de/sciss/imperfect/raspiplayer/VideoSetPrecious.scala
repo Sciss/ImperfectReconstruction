@@ -2,7 +2,7 @@
  *  VideoSetPrecious.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -37,7 +37,7 @@ object VideoSetPrecious extends VideoSet {
 
   private[this] final val nameFmt = "precious/precious%d%s%s.mp4"
 
-  def select()(implicit random: Random): Vec[Play] = {
+  def select()(implicit random: Random, screens: Screens): Vec[Play] = {
     import Util._
 
     val durTotI: Int = math.min(180, rrand(minDur, maxDur))

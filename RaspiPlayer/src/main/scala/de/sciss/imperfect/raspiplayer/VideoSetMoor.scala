@@ -2,7 +2,7 @@
  *  VideoSetMoor.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -34,7 +34,7 @@ object VideoSetMoor extends VideoSet {
 
   private[this] final val nameFmt = "moor/moor%d%s.mp4"
 
-  def select()(implicit random: Random): Vec[Play] = {
+  def select()(implicit random: Random, screens: Screens): Vec[Play] = {
     import Util._
 
     val durTotI: Int = math.min(4 minutes 9, rrand(minDur, maxDur))
@@ -49,7 +49,7 @@ object VideoSetMoor extends VideoSet {
       val delay   = if (durIn >= durTotI) 0f else rrand(0.0, durTotI - durIn).toFloat
       val fadeIn  = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
       val fadeOut = math.min(dur * 0.5, rrand(3.0, 4.5)).toFloat
-      val screen  = Screen(screenIdx)
+      val screen  = screens(screenIdx)
       val orient  = choose(screen.orientations)
       Play(file = file, delay = delay, start = start, duration = dur, fadeIn = fadeIn, fadeOut = fadeOut,
         orientation = orient)

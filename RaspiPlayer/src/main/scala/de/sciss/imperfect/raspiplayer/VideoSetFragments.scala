@@ -2,7 +2,7 @@
  *  VideoSetFragments.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -25,12 +25,12 @@ object VideoSetFragments extends VideoSet {
   private[this] final val nameFmt  = "fragments/fragment-%d.mp4"
   private[this] final val nameFmtS = "fragments/fragment-s-%d.mp4"
 
-  def select()(implicit random: Random): Vec[Play] = {
+  def select()(implicit random: Random, screens: Screens): Vec[Play] = {
     import Util._
 
     val indices   = random.shuffle(indicesExt).take(IndicesIn.size)
     val cmd       = indices.zipWithIndex.map { case (vidIdx, screenIdx) =>
-      val screen  = Screen(screenIdx)
+      val screen  = screens(screenIdx)
       val fmt     = if (screen.isHanging) nameFmt else nameFmtS
       val file    = fmt.format(vidIdx + 1)
       val fadeIn  = rrand(3.0, 4.5).toFloat

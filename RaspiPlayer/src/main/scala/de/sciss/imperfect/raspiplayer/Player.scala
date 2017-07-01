@@ -2,7 +2,7 @@
  *  Player.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -37,6 +37,12 @@ final class Player(config: Config, control: Option[Control]) {
   private[this] var playActive: Play = _
 
   private[this] val playSync = new AnyRef
+
+  @volatile
+  private[this] var winX: Int = config.winX
+
+  @volatile
+  private[this] var winY: Int = config.winY
 
   private def mkClient(): UDP.Client = {
     val c   = UDP.Config()
@@ -89,6 +95,10 @@ final class Player(config: Config, control: Option[Control]) {
       log("rebooting...")
       Main.reboot()
 
+    case osc.Message("/window", x: Int, y: Int) =>
+      winX = x
+      winY = y
+
     case _ =>
       Console.err.println(s"Unknown OSC message $p from control")
   }
@@ -131,7 +141,7 @@ final class Player(config: Config, control: Option[Control]) {
         sendStatus()
         Thread.sleep(4000)
       } catch {
-        case NonFatal(ex) =>
+        case NonFatal(_) =>
           if (client != null) {
             try {
               client.close()
@@ -194,6 +204,9 @@ final class Player(config: Config, control: Option[Control]) {
         if (config.small) {
           cmdB += "--win"
           cmdB += "384,256,896,768"
+        } else if (winX >= 0 && winY >= 0) {
+          cmdB += "--win"
+          cmdB += s"$winX,$winY,${winX + 1024},${winY + 1024}"
         }
         cmdB += videoF.path
 

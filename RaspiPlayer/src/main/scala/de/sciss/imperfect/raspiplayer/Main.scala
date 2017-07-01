@@ -2,7 +2,7 @@
  *  Main.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -23,11 +23,11 @@ object Main {
     val m     = clazz.getMethod(key)
     m.invoke(null).toString
   } catch {
-    case NonFatal(e) => "?"
+    case NonFatal(_) => "?"
   }
 
   def main(args: Array[String]): Unit = {
-    println(s"-- Imperfect Reconstruction v${buildInfString("version")}, built ${buildInfString("builtAtString")} --")
+    println(s"-- Inner Space v${buildInfString("version")}, built ${buildInfString("builtAtString")} --")
 
     val myIP    = Config.checkIP()
     val default = Config(thisHost = myIP, isControl = myIP == Config.controlIP)
@@ -45,11 +45,11 @@ object Main {
 
       opt[Unit] ('d', "dump-osc")
         .text (s"Enable OSC dump (default ${default.dumpOSC})")
-        .action   { (v, c) => c.copy(dumpOSC = true) }
+        .action   { (_, c) => c.copy(dumpOSC = true) }
 
       opt[Unit] ('c', "control")
         .text (s"Instance is control center (default ${default.isControl})")
-        .action   { (v, c) => c.copy(isControl = true) }
+        .action   { (_, c) => c.copy(isControl = true) }
 
       opt[Int] ("client-port")
         .text (s"Client OSC port (default ${default.clientPort})")
@@ -57,15 +57,24 @@ object Main {
 
       opt[Int] ('n', "num-clients")
         .text (s"Number of clients connected (default ${default.numClients})")
-        .action   { (v, c) => c.copy(numClients = v) }
+        .action { (v, c) =>
+          val ids = if (c.clientIds.size == v) c.clientIds else Nil
+          c.copy(numClients = v, clientIds = ids)
+        }
+
+      opt[Seq[Int]] ("clients")
+        .text (s"Client identifiers (last part of 192.168.0.x)")
+        .action { (v, c) =>
+          c.copy(clientIds = v.toList, numClients = v.size)
+        }
 
       opt[Unit] ("small")
         .text (s"Small display for debugging (default ${default.small})")
-        .action   { (v, c) => c.copy(small = true) }
+        .action   { (_, c) => c.copy(small = true) }
 
       opt[Unit] ("keep-energy")
         .text ("Do not turn off energy saving")
-        .action   { (v, c) => c.copy(disableEnergySaving = false) }
+        .action   { (_, c) => c.copy(disableEnergySaving = false) }
 
       opt[Int] ("background")
         .text (s"Background color 0xRRGGBB (default ${default.background.toHexString})")
@@ -74,6 +83,18 @@ object Main {
       opt[String] ("dbus")
         .text (s"dbus name for omxplayer (default: ${default.dbusName})")
         .action   { (v, c) => c.copy(dbusName = v) }
+
+      opt[Unit] ("esc")
+        .text ("Configure for esc media art lab (with horizontal screens)")
+        .action   { (_, c) => c.copy(isESC = true) }
+
+      opt[Int] ("win-x")
+        .text (s"Video player window horizontal coordinate (default ${default.winX})")
+        .action   { (v, c) => c.copy(winX = v) }
+
+      opt[Int] ("win-y")
+        .text (s"Video player window vertical coordinate (default ${default.winY})")
+        .action   { (v, c) => c.copy(winY = v) }
     }
     p.parse(args, default).fold(sys.exit(1)) { config =>
       if (config.disableEnergySaving) {
@@ -84,6 +105,7 @@ object Main {
 
       val controlOpt = if (!config.isControl) None else {
         log("Creating control")
+        implicit val screens: Screens = if (config.isESC) Screens.esc else Screens.xCoAx
         val ctl = new Control(config)
         ctl.start()
         Some(ctl)

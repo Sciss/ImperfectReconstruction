@@ -13,7 +13,7 @@ object VideoSetsRattle {
     protected def maxDur: Int
     protected def nameFmt: String
 
-    def select()(implicit random: Random): Vec[Play] = {
+    def select()(implicit random: Random, screens: Screens): Vec[Play] = {
       import Util._
 
       val durTotI: Int = rrand(minDur, maxDur)
@@ -27,7 +27,7 @@ object VideoSetsRattle {
         val fadeIn  = 1f
         val fadeOut = 1f
 
-        val screen  = Screen(screenIdx)
+        val screen  = screens(screenIdx)
         val orient  = choose(screen.orientations)
 
         Play(file = file, delay = delay, start = start, duration = dur, fadeIn = fadeIn, fadeOut = fadeOut,
@@ -39,7 +39,7 @@ object VideoSetsRattle {
   }
 
   object Neuro extends Common {
-    protected final val durations = Vector[Int](
+    protected final val durations: Vector[Int] = Vector(
       1 minutes 42,
       1 minutes 40,
       1 minutes 41,
@@ -57,7 +57,7 @@ object VideoSetsRattle {
   }
 
   object Phase extends Common {
-    protected final val durations = Vector[Int](
+    protected final val durations: Vector[Int] = Vector(
       2 minutes 36,
       2 minutes  6,
       2 minutes 40,
