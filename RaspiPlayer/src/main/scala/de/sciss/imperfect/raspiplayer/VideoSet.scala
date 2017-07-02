@@ -19,9 +19,10 @@ import scala.util.Random
 
 object VideoSet {
   /** All but 'fragments'. */
-  final val all: Vec[VideoSet] =
-//    Vector(VideoSetSite, VideoSetNotebook, VideoSetPrecious, VideoSetMoor, VideoSetTrunks)
-    Vector(VideoSetTrunks, VideoSetTrunks, VideoSetTrunks, VideoSetTrunks, VideoSetTrunks)
+  final val all: Vec[VideoSet] = {
+    Vector(VideoSetSite, VideoSetNotebook, VideoSetPrecious, VideoSetMoor, VideoSetTrunks)
+//    Vector(VideoSetTrunks, VideoSetTrunks, VideoSetTrunks, VideoSetTrunks, VideoSetTrunks)
+  }
 }
 trait VideoSet {
   def select()(implicit random: Random, screens: Screens): Vec[Play]

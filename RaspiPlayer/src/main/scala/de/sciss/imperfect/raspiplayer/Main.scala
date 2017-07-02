@@ -95,8 +95,27 @@ object Main {
       opt[Int] ("win-y")
         .text (s"Video player window vertical coordinate (default ${default.winY})")
         .action   { (v, c) => c.copy(winY = v) }
+
+//      opt[Unit] ("key-test")
+//        .text ("Test key matrix")
+//        .action   { (_, c) => c.copy(keyTest = true) }
+//
+      opt[Int] ("key-shutdown")
+        .text (s"Keypad key to trigger shutdown (1 to 9; default ${default.keyShutdown})")
+        .validate(i => if (i >= 1 && i <= 9) Right(()) else Left("Must be 1 to 9") )
+        .action { (v, c) => c.copy(keyShutdown = (v + '0').toChar) }
+
+      opt[Int] ("key-reboot")
+        .text (s"Keypad key to trigger reboot (1 to 9; default ${default.keyReboot})")
+        .validate(i => if (i >= 1 && i <= 9) Right(()) else Left("Must be 1 to 9") )
+        .action { (v, c) => c.copy(keyReboot = (v + '0').toChar) }
     }
     p.parse(args, default).fold(sys.exit(1)) { config =>
+//      if (config.keyTest) {
+//        KeyMatrix.test()
+//        sys.exit()
+//      }
+
       if (config.disableEnergySaving) {
         import sys.process._
         Seq("xset", "s", "off").!
@@ -108,12 +127,31 @@ object Main {
         implicit val screens: Screens = if (config.isESC) Screens.esc else Screens.xCoAx
         val ctl = new Control(config)
         ctl.start()
+
+//        if (hasKeys) KeyMatrix.run() {
+//          case config.keyShutdown => ctl.shutdown()
+//          case config.keyReboot   => ctl.reboot()
+//          case _ =>
+//        }
+
         Some(ctl)
       }
       log("Creating player")
       new Player(config, controlOpt).start()
+
+      val hasKeys = config.keyShutdown != Config.NotPressed || config.keyReboot != Config.NotPressed
+      if (hasKeys) {
+        startKeys(keyShutdown = config.keyShutdown, keyReboot = config.keyReboot)
+      }
+
       log("Ready.")
     }
+  }
+
+  def startKeys(keyShutdown: Char, keyReboot: Char): Unit = {
+    import sys.process._
+    val cmd = Seq("sudo", "imperfect-raspikeys", "--key-shutdown", keyShutdown.toString, "--key-reboot", keyReboot.toString)
+    cmd.run()
   }
 
   def shutdown(): Unit = {

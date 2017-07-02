@@ -1,29 +1,26 @@
 import com.typesafe.sbt.packager.linux.LinuxPackageMapping
 
-lazy val baseName         = "Imperfect-RaspiPlayer"
+lazy val baseName         = "Imperfect-RaspiKeys"
 lazy val baseNameL        = baseName.toLowerCase
-lazy val projectVersion   = "0.2.1"
+lazy val projectVersion   = "0.1.1"
 
 lazy val commonSettings = Seq(
   version             := projectVersion,
   organization        := "de.sciss",
   description         := "An algorithmic art project",
-  homepage            := Some(url(s"https://github.com/Sciss/$baseName")),
+  homepage            := Some(url("https://github.com/Sciss/ImperfectReconstruction")),
   scalaVersion        := "2.11.8",
   licenses            := Seq(gpl2),
   scalacOptions      ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture", "-Xlint:-stars-align,_"),
   resolvers           += "Typesafe Releases" at "https://repo.typesafe.com/typesafe/maven-releases/",
   libraryDependencies ++= Seq(
-    "de.sciss"               %% "fileutil"     % "1.1.2",
-    "de.sciss"               %% "numbers"      % "0.1.3",
-    "de.sciss"               %% "kollflitz"    % "0.2.0",
     "de.sciss"               %% "scalaosc"     % "1.1.5",
     "com.github.scopt"       %% "scopt"        % "3.5.0",
-    "com.pi4j"               %  "pi4j-core"    % "1.1" // needed for KeyMatrix
+    "com.pi4j"               %  "pi4j-core"    % "1.1"
   ),
   target in assembly := baseDirectory.value,
   // ---- build info ----
-  buildInfoPackage := "de.sciss.imperfect.raspiplayer",
+  buildInfoPackage := "de.sciss.imperfect.raspikeys",
   buildInfoKeys := Seq(name, organization, version, scalaVersion, description,
     BuildInfoKey.map(homepage) { case (k, opt)           => k -> opt.get },
     BuildInfoKey.map(licenses) { case (_, Seq((lic, _))) => "license" -> lic }
@@ -38,8 +35,10 @@ lazy val root = Project(id = baseNameL, base = file("."))
   .settings(commonSettings)
 
 // -------------
+
+lazy val mainClazz = "de.sciss.imperfect.raspikeys.Main"
  
-mainClass in assembly := Some("de.sciss.imperfect.raspiplayer.Main")
+mainClass in assembly := Some(mainClazz)
 
 assemblyJarName in assembly := s"$baseName.jar"
 
@@ -71,7 +70,7 @@ name        in Debian := baseName
 packageName in Debian := baseNameL
 name        in Linux  := baseName
 packageName in Linux  := baseNameL
-mainClass   in Debian := Some("de.sciss.imperfect.raspiplayer.Main")
+mainClass   in Debian := Some(mainClazz)
 maintainer  in Debian := s"Hanns Holger Rutz <contact@sciss.de>"
 debianPackageDependencies in Debian += "java7-runtime"
 packageSummary in Debian := description.value

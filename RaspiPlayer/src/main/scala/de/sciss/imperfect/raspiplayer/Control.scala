@@ -132,8 +132,12 @@ final class Control(config: Config)(implicit screens: Screens) {
     }
 
     if (streakToGo == 0) {
-      isDP  = !isDP
-      streakToGo  = if (isDP) VideoSetsRattle.all.size else VideoSet.all.size
+      isDP = !isDP
+      streakToGo = if (isDP) VideoSetsRattle.all.size else {
+        val vid = VideoSet.all.size
+        val txt = vid - 1
+        vid + txt
+      }
     }
     streakToGo -= 1
 

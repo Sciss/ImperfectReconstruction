@@ -21,8 +21,10 @@ object VideoSetTrunks extends VideoSet {
   private[this] final val nameFmt = "trunks/peripheries-trunk%d.mp4"
 
   // true = we advance to the right; false = we advance to the left
-  private[this] final val directions: Vec[Boolean] =
-    Vector(true, true, false, false, true)
+  private[this] final val directions: Vec[Boolean] = {
+    //     1     2     3      4      5     6      7      8
+    Vector(true, true, false, false, true, false, false, false)
+  }
 
   def select()(implicit random: Random, screens: Screens): Vec[Play] = {
     import Util._

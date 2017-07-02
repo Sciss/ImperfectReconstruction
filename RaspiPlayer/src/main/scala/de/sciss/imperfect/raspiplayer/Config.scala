@@ -91,6 +91,8 @@ object Config {
       }
     }
   }
+
+  final val NotPressed: Char = 'X'
 }
 final case class Config(isControl: Boolean, thisHost: String, clientPort: Int = 57120,
                         baseDir: File = userHome/"Documents"/"projects"/"Imperfect"/"inner_space",
@@ -99,4 +101,5 @@ final case class Config(isControl: Boolean, thisHost: String, clientPort: Int = 
                         disableEnergySaving: Boolean = true,
                         background: Int = 0xFF00000,
                         dbusName: String = "" /* "de.sciss.imperfect.Player%d" */,
-                        isESC: Boolean = false, winX: Int = -1, winY: Int = -1)
+                        isESC: Boolean = false, winX: Int = -1, winY: Int = -1,
+                        keyShutdown: Char = Config.NotPressed, keyReboot: Char = Config.NotPressed)
