@@ -94,12 +94,26 @@ object Config {
 
   final val NotPressed: Char = 'X'
 }
-final case class Config(isControl: Boolean, thisHost: String, clientPort: Int = 57120,
-                        baseDir: File = userHome/"Documents"/"projects"/"Imperfect"/"inner_space",
-                        numClients: Int = 5, clientIds: ISeq[Int] = Nil, dumpOSC: Boolean = false,
-                        small: Boolean = false,
-                        disableEnergySaving: Boolean = true,
-                        background: Int = 0xFF00000,
-                        dbusName: String = "" /* "de.sciss.imperfect.Player%d" */,
-                        isESC: Boolean = false, winX: Int = -1, winY: Int = -1,
-                        keyShutdown: Char = Config.NotPressed, keyReboot: Char = Config.NotPressed)
+final case class Config(isControl           : Boolean,
+                        thisHost            : String,
+                        clientPort          : Int       = 57120,
+                        baseDir             : File      = userHome/"Documents"/"projects"/"Imperfect"/"inner_space",
+                        numClients          : Int       = 5,
+                        clientIds           : ISeq[Int] = Nil,
+                        dumpOSC             : Boolean   = false,
+                        small               : Boolean   = false,
+                        disableEnergySaving : Boolean   = true,
+                        background          : Int       = 0xFF00000,
+                        dbusName            : String    = "" /* "de.sciss.imperfect.Player%d" */ ,
+                        isESC               : Boolean   = false,
+                        winX                : Int       = -1,
+                        winY                : Int       = -1,
+                        keyShutdown         : Char      = Config.NotPressed,
+                        keyReboot           : Char      = Config.NotPressed,
+                        buttonShutdown      : Int       = 0,
+                        buttonReboot        : Int       = 0
+                       ) {
+
+  val hasKeys   : Boolean = keyShutdown != Config.NotPressed || keyReboot != Config.NotPressed
+  val hasButtons: Boolean = buttonShutdown != 0 || buttonReboot != 0
+}

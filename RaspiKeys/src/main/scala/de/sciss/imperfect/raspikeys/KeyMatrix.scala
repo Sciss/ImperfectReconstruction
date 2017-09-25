@@ -14,7 +14,6 @@
 package de.sciss.imperfect.raspikeys
 
 import com.pi4j.io.gpio.{GpioFactory, PinMode, PinPullResistance, PinState}
-import de.sciss.osc
 
 import scala.util.control.NonFatal
 

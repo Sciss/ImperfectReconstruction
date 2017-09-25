@@ -16,4 +16,8 @@ package de.sciss.imperfect.raspikeys
 object Config {
   val controlIP = "192.168.0.11"
 }
-final case class Config(isTest: Boolean = false, keyShutdown : Char = '1', keyReboot: Char = '3')
+final case class Config(isTest: Boolean = false, keyShutdown : Char = '1', keyReboot: Char = '3',
+                        buttonShutdown: Int = 0, buttonReboot: Int = 0) {
+
+  val hasButtons: Boolean = buttonShutdown != 0 || buttonReboot != 0
+}

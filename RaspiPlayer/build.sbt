@@ -2,7 +2,7 @@ import com.typesafe.sbt.packager.linux.LinuxPackageMapping
 
 lazy val baseName         = "Imperfect-RaspiPlayer"
 lazy val baseNameL        = baseName.toLowerCase
-lazy val projectVersion   = "0.2.1"
+lazy val projectVersion   = "0.2.2"
 
 lazy val commonSettings = Seq(
   version             := projectVersion,
@@ -18,8 +18,7 @@ lazy val commonSettings = Seq(
     "de.sciss"               %% "numbers"      % "0.1.3",
     "de.sciss"               %% "kollflitz"    % "0.2.0",
     "de.sciss"               %% "scalaosc"     % "1.1.5",
-    "com.github.scopt"       %% "scopt"        % "3.5.0",
-    "com.pi4j"               %  "pi4j-core"    % "1.1" // needed for KeyMatrix
+    "com.github.scopt"       %% "scopt"        % "3.5.0"
   ),
   target in assembly := baseDirectory.value,
   // ---- build info ----
