@@ -2,7 +2,7 @@ import com.typesafe.sbt.packager.linux.LinuxPackageMapping
 
 lazy val baseName         = "Imperfect-RaspiKeys"
 lazy val baseNameL        = baseName.toLowerCase
-lazy val projectVersion   = "0.2.2"
+lazy val projectVersion   = "0.2.3"
 
 lazy val commonSettings = Seq(
   version             := projectVersion,

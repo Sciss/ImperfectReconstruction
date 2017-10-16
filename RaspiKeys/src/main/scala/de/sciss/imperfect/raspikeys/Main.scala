@@ -13,6 +13,8 @@
 
 package de.sciss.imperfect.raspikeys
 
+import java.net.{InetSocketAddress, SocketAddress}
+
 import de.sciss.osc
 
 import scala.util.control.NonFatal
@@ -55,6 +57,14 @@ object Main {
         .text (s"Button 8-bit integer to trigger reboot (default ${default.keyShutdown})")
         .validate(i => if (i >= 1 && i <= 255) Right(()) else Left("Must be 1 to 255") )
         .action { (v, c) => c.copy(buttonReboot = v) }
+
+      opt[String] ("ip")
+        .text (s"Target IP address (default ${default.targetIP})")
+        .action { (v, c) => c.copy(targetIP = v) }
+
+      opt[Int] ("port")
+        .text (s"Target OSC port (default ${default.targetPort})")
+        .action { (v, c) => c.copy(targetPort = v) }
     }
     p.parse(args, default).fold(sys.exit(1)) { config =>
       if (config.isTest) {
@@ -65,6 +75,8 @@ object Main {
 
         sys.exit()
       }
+
+      val target = new InetSocketAddress(config.targetIP, config.targetPort)
 
       if (config.hasButtons) {
         var code    = 0
@@ -86,8 +98,8 @@ object Main {
             if (numBits == 8) {
               println(s"Button code: $code")
 
-              if      (code == config.buttonShutdown ) shutdown()
-              else if (code == config.buttonReboot   ) reboot()
+              if      (code == config.buttonShutdown ) shutdown(target)
+              else if (code == config.buttonReboot   ) reboot  (target)
             }
           }
         }
@@ -95,8 +107,8 @@ object Main {
 
       } else {
         KeyMatrix.run() {
-          case config.keyShutdown => shutdown()
-          case config.keyReboot   => reboot()
+          case config.keyShutdown => shutdown(target)
+          case config.keyReboot   => reboot  (target)
           case _ =>
         }
         println("keys running.")
@@ -104,13 +116,12 @@ object Main {
     }
   }
 
-  def shutdown(): Unit = sendToControl("/shutdown")
-  def reboot  (): Unit = sendToControl("/reboot"  )
+  def shutdown(target: SocketAddress): Unit = sendToControl(target, "/shutdown")
+  def reboot  (target: SocketAddress): Unit = sendToControl(target, "/reboot"  )
 
-  private def sendToControl(cmd: String): Unit = {
+  private def sendToControl(target: SocketAddress, cmd: String): Unit = {
     try {
-      import osc.Implicits._
-      val t = osc.UDP.Transmitter("192.168.0.11" -> 57110)
+      val t = osc.UDP.Transmitter(target)
       t.dump()
       try {
         t.connect()
