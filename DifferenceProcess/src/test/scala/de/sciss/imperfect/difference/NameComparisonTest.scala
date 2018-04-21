@@ -2,8 +2,6 @@ package de.sciss.imperfect.difference
 
 import de.sciss.file._
 
-import scala.util.control.NonFatal
-
 object NameComparisonTest {
   def main(args: Array[String]): Unit = {
     val baseDirInt: File    = file("/") / "data" / "projects" / "Imperfect"
