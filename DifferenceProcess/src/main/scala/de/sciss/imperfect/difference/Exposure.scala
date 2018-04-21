@@ -2,7 +2,7 @@
  *  Exposure.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2018 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
@@ -40,7 +40,9 @@ object Exposure {
                     metering  : MeteringMode  = MeteringMode.AVERAGE,
                     flipH     : Boolean       = false,
                     flipV     : Boolean       = false,
-                    encoding  : Encoding      = Encoding.JPG
+                    encoding  : Encoding      = Encoding.JPG,
+                    useKeyPad : Boolean       = false,
+                    useButtons: Boolean       = false
                    )
 
   sealed trait State
@@ -58,7 +60,17 @@ object Exposure {
       opt[Int   ]('w', "width")        text "Image width in pixels"  action { (x, c) => c.copy(width  = x) }
       opt[Int   ]('h', "height")       text "Image height in pixels" action { (x, c) => c.copy(height = x) }
 //      opt[Double]("min-phrase")        text "Minimum phrase duration in seconds" action { (x, c) => c.copy(minPhrase = x) }
-      opt[Unit  ]('g', "gpio")         text "Enable GPIO equipment (key matrix and LED)" action { (_, c) => c.copy(useGPIO = true) }
+      opt[Unit  ]('g', "gpio")
+        .text("Enable GPIO equipment (key matrix and LED)")
+        .action { (_, c) =>
+          val kp = !c.useButtons
+          c.copy(useGPIO = true, useKeyPad = kp)
+        }
+      opt[Unit  ]("buttons")
+        .text("Enable GPIO buttons, instead of key-matrix")
+        .action { (_, c) =>
+          c.copy(useGPIO = true, useKeyPad = false, useButtons = true)
+        }
       opt[Unit  ]('z', "shutdown")     text "Enable computer shutdown after termination" action { (_, c) => c.copy(shutdown = true) }
       opt[Int   ]('s', "shutter")      text "Shutter speed in microseconds" action { (_, c) => c.copy(shutdown = true) }
       opt[Int   ]('i', "iso")          text "ISO value" action { (x, c) => c.copy(iso = x) }
@@ -98,8 +110,12 @@ object Exposure {
     require(siteDir.mkdir())
     println(s"Next site will be #$countSite")
 
-    val keys  = if (useGPIO) new KeyMatrix    else null
-    val led   = if (useGPIO) new DualColorLED else null
+    val keys    = if (useKeyPad)  new KeyMatrix    else null
+    val buttons = if (useButtons) new Buttons      else null
+    val led     = if (useGPIO)    new DualColorLED else null
+
+    if (keys    != null) println("Using key-pad.")
+    if (buttons != null) println("Using buttons.")
 
     val cam = new RPiCamera(siteDir.path)
     // cf. https://raspberrypi.stackexchange.com/questions/14047/
@@ -138,7 +154,9 @@ object Exposure {
       var dlyRemain = delayTime
       while (dlyRemain > 0) {
         Thread.sleep(100)
-        if (useGPIO) (keys.read(): @switch) match {
+        val char = if (keys != null) keys.read() else if (buttons != null) buttons.read() else Buttons.NotPressed
+
+        (char: @switch) match {
           case '1' =>
             if (state != StateRecord) {
               state     = StateRecord
@@ -157,6 +175,7 @@ object Exposure {
 
           case _ =>
         }
+
         dlyRemain -= 100
       }
     }

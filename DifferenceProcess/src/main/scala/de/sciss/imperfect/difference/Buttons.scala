@@ -11,16 +11,14 @@
  *  contact@sciss.de
  */
 
-package de.sciss.imperfect.raspikeys
+package de.sciss.imperfect.difference
 
-import com.pi4j.io.gpio.{GpioFactory, PinMode}
+import com.pi4j.io.gpio.{GpioFactory, PinMode, PinPullResistance}
 
 import scala.util.control.NonFatal
 
 object Buttons {
   val NotPressed = 'X'
-
-  private val ButtonPad = Array('1', '2')
 
   import com.pi4j.io.gpio.RaspiPin._
 
@@ -28,14 +26,18 @@ object Buttons {
 
     the wires are as follows:
     brown  = GND-jacket / +3V
-    red    = black button / GPIO 17
-    orange = red button   / GPIO 18
+    red    = black button / header 15
+    orange = red button   / header 16
 
     or with the red/green button box:
 
+    brown = GND --> +3V / header 17 (9th from top-left)
+    yellow = green button / header 15 (8th from top-left)
+    orange = red button / header 16 (8th from top-right)
+
    */
 
-  private val rows = Array(GPIO_00, GPIO_01)  // BCM: 17, 18
+  private val rows = Array(GPIO_04, GPIO_05)  // header 16, 18
 
   def test(): Unit = {
     val m   = new Buttons
@@ -80,17 +82,15 @@ final class Buttons {
   private[this] val io = GpioFactory.getInstance
 
   private[this] val rowPins = rows.map(pin =>
-    io.provisionDigitalMultipurposePin(pin, PinMode.DIGITAL_INPUT)) // , PinPullResistance.PULL_UP))
+    io.provisionDigitalMultipurposePin(pin, PinMode.DIGITAL_INPUT, PinPullResistance.PULL_DOWN))
 
   /** Retrieves the currently pressed key, or `NotPressed` in case no key press is detected. */
   def read(): Char = {
-    // Scan rows for pushed key/button
-    // A valid key press should set "rowVal"  between 0 and 3.
-    val rowIdx = rowPins.indexWhere(_.isHigh)
-
-    // if rowIdx is not in 0 to 2 then no button was pressed and we can exit
-    if (rowIdx < 0) return NotPressed
-
-    ButtonPad(rowIdx)
+    val is1 = rowPins(0).isHigh
+    val is2 = rowPins(1).isHigh
+    if (is1 && is2) '9'
+    else if (is1)   '1'
+    else if (is2)   '2'
+    else NotPressed
   }
 }

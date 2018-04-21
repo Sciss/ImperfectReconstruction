@@ -2,20 +2,20 @@ import com.typesafe.sbt.packager.linux.LinuxPackageMapping
 
 lazy val baseName         = "Imperfect-RaspiKeys"
 lazy val baseNameL        = baseName.toLowerCase
-lazy val projectVersion   = "0.2.3"
+lazy val projectVersion   = "0.3.0-SNAPSHOT"
 
 lazy val commonSettings = Seq(
   version             := projectVersion,
   organization        := "de.sciss",
   description         := "An algorithmic art project",
   homepage            := Some(url("https://github.com/Sciss/ImperfectReconstruction")),
-  scalaVersion        := "2.11.8",
+  scalaVersion        := "2.12.5",
   licenses            := Seq(gpl2),
   scalacOptions      ++= Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture", "-Xlint:-stars-align,_"),
   resolvers           += "Typesafe Releases" at "https://repo.typesafe.com/typesafe/maven-releases/",
   libraryDependencies ++= Seq(
-    "de.sciss"               %% "scalaosc"     % "1.1.5",
-    "com.github.scopt"       %% "scopt"        % "3.5.0",
+    "de.sciss"               %% "scalaosc"     % "1.1.6",
+    "com.github.scopt"       %% "scopt"        % "3.7.0",
     "com.pi4j"               %  "pi4j-core"    % "1.1"
   ),
   target in assembly := baseDirectory.value,
@@ -30,7 +30,7 @@ lazy val commonSettings = Seq(
 
 lazy val gpl2 = "GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt")
 
-lazy val root = Project(id = baseNameL, base = file("."))
+lazy val root = project.withId(baseNameL).in(file("."))
   .enablePlugins(BuildInfoPlugin)
   .settings(commonSettings)
 

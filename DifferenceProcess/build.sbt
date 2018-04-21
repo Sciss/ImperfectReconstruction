@@ -27,7 +27,13 @@ lazy val commonSettings = Seq(
     "com.pi4j"          %  "pi4j-core"          % "1.1",
     "de.sciss"          %  "jrpicam"            % "0.2.0"
   ),
-  target in assembly := baseDirectory.value
+  target in assembly := baseDirectory.value,
+  assemblyMergeStrategy in assembly := {
+    case PathList("de", "sciss", "lucre", "stm", _ @ _*) => MergeStrategy.first
+    case x =>
+      val oldStrategy = (assemblyMergeStrategy in assembly).value
+      oldStrategy(x)
+  }
 )
 
 lazy val gpl2 = "GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt")

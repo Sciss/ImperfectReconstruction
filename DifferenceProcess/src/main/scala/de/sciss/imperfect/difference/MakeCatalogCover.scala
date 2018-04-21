@@ -2,7 +2,7 @@
  *  MakeCatalogCover.scala
  *  (Imperfect Reconstruction)
  *
- *  Copyright (c) 2016-2017 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2016-2018 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is published under the GNU General Public License v2+
  *
